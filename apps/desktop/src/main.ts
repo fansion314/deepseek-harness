@@ -4,6 +4,7 @@ import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import processSignals from 'node:process'
 import {
   app,
   BrowserWindow,
@@ -55,6 +56,8 @@ import { DesktopUpdateOverlays } from './update-overlay.ts'
 import { DesktopQuitConfirmation } from './quit-confirmation.ts'
 import { DesktopTray } from './tray.ts'
 import { DesktopBackgroundNotice } from './background-notice.ts'
+import { installDesktopTermination } from './termination.ts'
+import { DesktopInterfaceScale } from './interface-scale.ts'
 
 let focusPrimaryWindow = (): void => {}
 let stopForRecovery = async (): Promise<void> => {}
@@ -146,7 +149,7 @@ interface RuntimeResources {
 
 function runtimeResources(): RuntimeResources {
   const development = !app.isPackaged
-  const node = process.execPath
+  const node = (development ? process.env.DSH_DESKTOP_HOST_NODE : undefined) ?? process.execPath
   const nodeBin = development ? join(app.getAppPath(), 'scripts', 'node-bin') : join(process.resourcesPath, 'runtime', 'bin')
   const pnpm = (development ? process.env.DSH_DESKTOP_PNPM_ENTRY : undefined)
     ?? (development ? join(app.getAppPath(), 'node_modules', 'pnpm', 'bin', 'pnpm.mjs')
@@ -323,6 +326,11 @@ async function main(): Promise<void> {
   let startup: Promise<void> | undefined
   let workspaceRecovery: Promise<void> | undefined
   let mainWindow: BrowserWindow | undefined
+  const interfaceScale = new DesktopInterfaceScale(join(app.getPath('userData'), 'interface-scale.json'), (state) => {
+    if (mainWindow === undefined || mainWindow.isDestroyed()) return
+    mainWindow.webContents.setZoomFactor(state.factor)
+    mainWindow.webContents.send(DESKTOP_IPC.scaleChanged, state)
+  })
   let welcomeWindow: BrowserWindow | undefined
   let enteredWorkspace = false
   // NSIS passes --updated when it launches the application after installation.
@@ -681,6 +689,8 @@ async function main(): Promise<void> {
       || !event.senderFrame.url.startsWith('dsh-app://app/')) throw new Error('Rejected Platform command')
     return owner
   }
+  ipcMain.handle(DESKTOP_IPC.scaleStatus, (event) => { assertMainApplication(event); return interfaceScale.state })
+  ipcMain.handle(DESKTOP_IPC.scaleSet, (event, value: unknown) => { assertMainApplication(event); return interfaceScale.set(value) })
   ipcMain.on(PLATFORM_IPC.bootstrap, (event) => {
     try { event.returnValue = platformView.bootstrap(event) }
     catch { event.returnValue = null }
@@ -688,11 +698,11 @@ async function main(): Promise<void> {
   ipcMain.handle(PLATFORM_IPC.open, (event, page: unknown, bounds: unknown) => {
     const owner = assertMainApplication(event)
     if (page !== 'usage' && page !== 'top-up') throw new Error('Invalid Platform page')
-    return platformView.open(owner, page, platformBounds(bounds))
+    return platformView.open(owner, page, platformBounds(bounds, owner.webContents.getZoomFactor()))
   })
   ipcMain.handle(PLATFORM_IPC.bounds, (event, bounds: unknown) => {
-    assertMainApplication(event)
-    platformView.setBounds(platformBounds(bounds))
+    const owner = assertMainApplication(event)
+    platformView.setBounds(platformBounds(bounds, owner.webContents.getZoomFactor()))
   })
   ipcMain.handle(PLATFORM_IPC.close, (event) => { assertMainApplication(event); platformView.close() })
   // Only the main window may synchronize its palette with the native material.
@@ -1011,15 +1021,19 @@ async function main(): Promise<void> {
   }
   const createMainWindow = (): BrowserWindow => {
     const window = createWindow(appPreload, false, true)
+    window.webContents.setZoomMode('isolated')
+    window.webContents.setZoomFactor(interfaceScale.state.factor)
+    window.webContents.on('did-finish-load', () => { window.webContents.setZoomFactor(interfaceScale.state.factor) })
     mainWindow = window
     browserGuests.bind(window, (guest, name) => shortcuts.attachGuest(window, guest, name))
     shortcuts.attach(window)
     window.on('focus', automaticCheck)
-    // Closing hides: the page and the Host keep running, and the next show resumes the same document.
+    // Linux has no background tray; closing requests application shutdown.
     window.on('close', (event) => {
       if (quitting || shellInstallerOwnsQuit || sessionEnding) return
       event.preventDefault()
       if (updateDialog.isOpen) { updateDialog.focus(); return }
+      if (process.platform === 'linux') { app.quit(); return }
       const hide = (): void => {
         if (!quitting && !shellInstallerOwnsQuit && !sessionEnding && !window.isDestroyed()) hideMainWindow(window)
       }
@@ -1224,6 +1238,15 @@ async function main(): Promise<void> {
     }).catch((error: unknown) => { console.error(error); if (!quitting && !shellInstallerOwnsQuit) finishQuit() })
   })
 
+  if (process.platform === 'linux') {
+    const disposeTermination = installDesktopTermination(processSignals, () => {
+      shuttingDown = true
+      quitWithoutConfirmation()
+    })
+    app.once('will-quit', disposeTermination)
+  }
+
+  await interfaceScale.load()
   mainWindow = createMainWindow()
   const manifest: unknown = JSON.parse(await readFile(join(app.getAppPath(), 'package.json'), 'utf8'))
   if (typeof manifest !== 'object' || manifest === null) throw new Error('desktop policy: invalid application manifest')

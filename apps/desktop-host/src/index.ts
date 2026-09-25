@@ -95,7 +95,8 @@ async function main(): Promise<void> {
   await ctx.plugin(desktopOffice, {
     runtimeDir,
     source: process.argv[4] ?? join(runtimeDir, '..', 'runtime', 'primary-runtime'),
-    root: join(resolveDshHome(), 'dsh-runtimes', 'dsh-primary-runtime'),
+    ...(process.env.DSH_DESKTOP_PRIMARY_RUNTIME_IN_PLACE === '1' ? {}
+      : { root: join(resolveDshHome(), 'dsh-runtimes', 'dsh-primary-runtime') }),
   })
   installPlatformSessionPublisher(ctx, (session) => {
     if (process.connected) process.send?.({ type: 'platform-session', session })

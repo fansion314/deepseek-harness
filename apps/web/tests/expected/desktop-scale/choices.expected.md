@@ -1,0 +1,9 @@
+- menu:
+  - menuitem "75%"
+  - menuitem "90%"
+  - menuitem "100%"
+  - menuitem "110%"
+  - menuitem "125%"
+  - menuitem "150%"
+  - menuitem "175%"
+  - menuitem "200%"

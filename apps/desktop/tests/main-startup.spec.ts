@@ -75,6 +75,8 @@ const harness = await vi.hoisted(async () => {
       getURL: () => this.urls.at(-1) ?? '',
       mainFrame: { url: '' },
       getZoomFactor: () => 1,
+      setZoomFactor: vi.fn(),
+      setZoomMode: vi.fn(),
       isDestroyed: () => this.destroyed,
       setIgnoreMenuShortcuts: vi.fn(),
       focus: vi.fn(),
@@ -406,6 +408,7 @@ afterEach(async () => {
   await vi.advanceTimersByTimeAsync(0)
   for (const host of harness.hosts) { host.ready.resolve(); host.exited.resolve() }
   await harness.quitCompleted.promise
+  harness.app.emit('will-quit')
   vi.restoreAllMocks()
   vi.clearAllTimers()
   vi.useRealTimers()
@@ -1119,6 +1122,19 @@ describe('desktop main startup', () => {
     const relabels = harness.trays[0]!.setContextMenu.mock.calls.length
     harness.ipcOn.mock.calls.find(call => call[0] === DESKTOP_IPC.localeChanged)![1]({ sender: window.webContents, senderFrame: window.webContents.mainFrame }, 'zh')
     expect(harness.trays[0]!.setContextMenu.mock.calls.length).toBe(relabels + 1)
+  })
+
+  it('quits on Linux window close and waits for the Host to exit', async () => {
+    vi.stubGlobal('process', { ...process, platform: 'linux' })
+    const host = await readyWorkspace()
+    harness.windows[0]!.close()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(host.inspectQuit).toHaveBeenCalledOnce()
+    await host.stopping.promise
+    expect(harness.app.quit).toHaveBeenCalledOnce()
+    expect(harness.dialog.showMessageBox).not.toHaveBeenCalled()
+    host.exited.resolve()
+    await harness.quitCompleted.promise
   })
 
   it('keeps the workspace visible while acknowledgement is pending and ignores a destroyed window', async () => {

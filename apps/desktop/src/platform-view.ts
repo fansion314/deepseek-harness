@@ -15,16 +15,17 @@ export interface PlatformBounds { x: number; y: number; width: number; height: n
 /**
  * Decode the renderer rectangle before allocating a native view.
  * @param value - IPC payload.
+ * @param zoomFactor - Owning workspace's zoom, converting CSS pixels to desktop coordinates.
  * @returns finite, nonnegative integer coordinates.
  */
-export function platformBounds(value: unknown): PlatformBounds {
+export function platformBounds(value: unknown, zoomFactor = 1): PlatformBounds {
   if (typeof value !== 'object' || value === null) throw new Error('Invalid Platform bounds')
   const row = value as Record<string, unknown>
   const result: PlatformBounds = { x: 0, y: 0, width: 0, height: 0 }
   for (const key of ['x', 'y', 'width', 'height'] as const) {
     const n = row[key]
     if (typeof n !== 'number' || !Number.isFinite(n) || n < 0 || n > 100_000) throw new Error('Invalid Platform bounds')
-    result[key] = Math.round(n)
+    result[key] = Math.round(n * zoomFactor)
   }
   return result
 }

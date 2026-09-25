@@ -1,6 +1,7 @@
 /** Origin-scoped boot, native directory selection, host paths of picked files, and update presentation with native confirmation actions. */
 
 import type { DesktopShortcutInput, ShortcutConfigSnapshot, ShortcutSaveResult } from '@deepseek-ai/dsh-client-shortcuts/protocol'
+import type { DesktopScaleState } from '@deepseek-ai/dsh-client-ui-settings-general/types'
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { DESKTOP_IPC, SCHEME, type DshDesktopProductApi, type DesktopUpdatePresentation } from './ipc.ts'
 import { PLATFORM_IPC } from './platform-ipc.ts'
@@ -13,6 +14,15 @@ import { createDesktopBrowserBridge } from './preload-browser.ts'
 function createProductApi(): DshDesktopProductApi {
   return {
     protocolVersion: 1,
+    scale: {
+      status: () => ipcRenderer.invoke(DESKTOP_IPC.scaleStatus) as Promise<DesktopScaleState>,
+      set: factor => ipcRenderer.invoke(DESKTOP_IPC.scaleSet, factor) as Promise<DesktopScaleState>,
+      subscribe(listener) {
+        const handle = (_event: Electron.IpcRendererEvent, state: DesktopScaleState): void => { listener(state) }
+        ipcRenderer.on(DESKTOP_IPC.scaleChanged, handle)
+        return () => { ipcRenderer.off(DESKTOP_IPC.scaleChanged, handle) }
+      },
+    },
     browser: createDesktopBrowserBridge(),
     keyboard: {
       closeWindow: revision => ipcRenderer.invoke(DESKTOP_IPC.shortcutsCloseWindow, revision) as Promise<void>,

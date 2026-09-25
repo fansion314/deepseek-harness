@@ -196,6 +196,8 @@ export class DesktopHostProcess {
       ...this.packageManager === undefined ? [] : [this.packageManager.pnpm, this.packageManager.nodeBin],
     ], {
       cwd: this.projectDir,
+      // Terminal signals belong to the shell, which stops the Host over IPC.
+      detached: process.platform === 'linux',
       env: desktopNodeEnvironment(this.node, undefined, this.environment),
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     })

@@ -1,0 +1,110 @@
+name: Arch Linux release
+
+on:
+  push:
+    tags: ['arch-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arch-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'fansion314/deepseek-harness'
+    runs-on: ubuntu-latest
+    container: archlinux:base
+    timeout-minutes: 90
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - name: Initialize Arch runner
+        run: |
+          pacman -Syu --noconfirm --needed base-devel git
+          useradd --create-home builder
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install recipe dependencies and test tools
+        shell: bash
+        run: |
+          source aur/dsh-electron/PKGBUILD
+          pacman -S --noconfirm --needed "${depends[@]}" "${makedepends[@]}" desktop-file-utils xorg-server-xvfb xorg-xauth dbus
+
+      - name: Build and test the desktop runtime
+        shell: bash
+        run: |
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          runuser -u builder -- bash -euo pipefail <<'BUILD'
+          source aur/dsh-electron/PKGBUILD
+          export DSH_ARCH_PKGREL="$pkgrel"
+          pnpm install --frozen-lockfile
+          node --test aur/system-runtime.test.mjs
+          pnpm run build
+          pnpm exec tsx aur/build.ts
+          dbus-run-session -- xvfb-run -a node aur/smoke-shell.mjs
+          desktop-file-validate aur/dsh-electron.desktop
+          BUILD
+
+      - name: Generate AUR metadata and build both Arch packages
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          runuser -u builder --preserve-environment -- bash -euo pipefail <<'PACKAGE'
+          source aur/dsh-electron/PKGBUILD
+          if [[ "$REF_TYPE" == tag ]]; then [[ "$REF_NAME" == "$_tag" ]]; fi
+          export ARCH_TAG="$_tag"
+          bash aur/prepare-release.sh
+          cp release/dsh-electron-*.tar.zst release/aur/dsh-electron-bin/
+          (cd release/aur/dsh-electron-bin && makepkg --cleanbuild --noconfirm)
+          cp release/aur/dsh-electron-bin/*.pkg.tar.zst release/
+          # Source builds execute the same build() above; package() consumes its verified payload.
+          mkdir -p release/aur/dsh-electron/src/deepseek-harness/release
+          cp release/dsh-electron-*.tar.zst release/aur/dsh-electron/src/deepseek-harness/release/
+          (cd release/aur/dsh-electron && makepkg --repackage --nodeps --noconfirm)
+          cp release/aur/dsh-electron/*.pkg.tar.zst release/
+          (cd release && sha256sum ./*.pkg.tar.zst >> SHA256SUMS)
+          PACKAGE
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: arch-release
+          if-no-files-found: error
+          path: |
+            release/*.tar.zst
+            release/*-aur.tar.gz
+            release/SHA256SUMS
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/arch-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: arch-release
+          path: release
+
+      - name: Publish verified Arch packages
+        working-directory: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ARCH_TAG: ${{ github.ref_name }}
+        run: |
+          sha256sum --check SHA256SUMS
+          gh release create "$ARCH_TAG" --verify-tag --prerelease \
+            --title "DeepSeek Harness $ARCH_TAG for Arch Linux" \
+            --notes 'Community Arch Linux/CachyOS build using system Electron 44. Updates are managed by pacman. Includes source and binary AUR recipes; no Electron binary is bundled.' \
+            ./*.tar.zst ./*-aur.tar.gz SHA256SUMS
