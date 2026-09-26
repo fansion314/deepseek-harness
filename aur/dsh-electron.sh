@@ -1,13 +1,13 @@
 #!/bin/bash
-# System Electron renders the shell; system Node runs the Host.
+# System Electron renders the shell and supplies Node for the Host.
 set -euo pipefail
 app=$(realpath -- "$(dirname -- "${BASH_SOURCE[0]}")/../lib/dsh-electron")
 export DSH_DESKTOP_DSH_DIR="$app/dsh"
-system_runtime=$(/usr/bin/node "$app/system-runtime.mjs" "$app" "${XDG_CACHE_HOME:-$HOME/.cache}/dsh-electron/runtimes")
-export DSH_DESKTOP_PNPM_ENTRY=/usr/lib/node_modules/pnpm/bin/pnpm.mjs
+system_runtime=$("$app/runtime/bin/node" "$app/system-runtime.mjs" "$app" "${XDG_CACHE_HOME:-$HOME/.cache}/dsh-electron/runtimes")
+export DSH_DESKTOP_PNPM_ENTRY="$app/runtime/pnpm/bin/pnpm.mjs"
 export DSH_DESKTOP_PRIMARY_RUNTIME_DIR="$system_runtime/primary-runtime"
 export DSH_DESKTOP_PRIMARY_RUNTIME_IN_PLACE=1
-export DSH_DESKTOP_HOST_NODE=/usr/bin/node
+export DSH_DESKTOP_HOST_NODE=/usr/lib/electron44/electron
 export DSH_DESKTOP_OPEN_DEVTOOLS=0
 export ELECTRON_FORCE_IS_PACKAGED=false
 unset ELECTRON_RUN_AS_NODE

@@ -1,7 +1,7 @@
 pkgbase = dsh-electron
 	pkgdesc = DeepSeek Harness desktop using system Electron
 	pkgver = 0.1.7rc.2
-	pkgrel = 1
+	pkgrel = 2
 	url = https://github.com/fansion314/deepseek-harness
 	arch = x86_64
 	license = MIT
@@ -9,9 +9,12 @@ pkgbase = dsh-electron
 	makedepends = rust
 	makedepends = clang
 	makedepends = cmake
+	makedepends = nodejs>=24
+	makedepends = pnpm
+	makedepends = node-gyp
+	makedepends = pkgconf
 	depends = electron44
-	depends = nodejs>=24
-	depends = pnpm
+	depends = libvips
 	depends = python
 	depends = python-numpy
 	depends = python-pandas
@@ -32,7 +35,7 @@ pkgbase = dsh-electron
 	depends = xdg-utils
 	conflicts = dsh-electron-bin
 	options = !strip
-	source = deepseek-harness::git+https://github.com/fansion314/deepseek-harness.git#tag=arch-v0.1.7-rc.2-1
+	source = deepseek-harness::git+https://github.com/fansion314/deepseek-harness.git#tag=arch-v0.1.7-rc.2-2
 	sha256sums = SKIP
 
 pkgname = dsh-electron

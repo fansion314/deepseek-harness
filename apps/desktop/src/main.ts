@@ -931,18 +931,24 @@ async function main(): Promise<void> {
     { role: 'toggleDevTools', visible: false, accelerator: 'F12' },
   ]
   const refreshApplicationMenu = (): void => {
-    Menu.setApplicationMenu(Menu.buildFromTemplate(process.platform === 'win32' ? devToolsItems : [{
+    Menu.setApplicationMenu(process.platform === 'linux' ? null : Menu.buildFromTemplate(process.platform === 'win32' ? devToolsItems : [{
       label: darwin ? app.name : currentDesktopLocale().messages.application,
       submenu: [...applicationItems(), ...devToolsItems],
     }, ...platformMenus()]))
     tray?.relabel()
   }
   refreshApplicationMenu()
-  const trayIconPath = development ? join(app.getAppPath(), 'resources', 'tray-windows.ico') : join(process.resourcesPath, 'tray.ico')
-  if (process.platform === 'win32') {
+  const trayIconPath = process.platform === 'linux' ? applicationIconPath
+    : development ? join(app.getAppPath(), 'resources', 'tray-windows.ico') : join(process.resourcesPath, 'tray.ico')
+  if (process.platform === 'win32' || process.platform === 'linux') {
     // The tray is the way back to a hidden window; without it, relaunching the application still focuses it.
     try {
       tray = new DesktopTray({ iconPath: trayIconPath, locale: currentDesktopLocale,
+        ...(process.platform === 'linux' ? { applicationItems: () => applicationItems().filter(item => item.role !== 'quit').map((item) => {
+          if (item.role !== 'reload') return item
+          const { role: _role, ...reload } = item
+          return { ...reload, click: () => { mainWindow?.webContents.reload() } }
+        }) } : {}),
         open: () => { focusPrimaryWindow() }, quit: () => { app.quit() } })
     } catch (error) { console.warn('desktop tray: unavailable', error) }
   }
@@ -1028,12 +1034,12 @@ async function main(): Promise<void> {
     browserGuests.bind(window, (guest, name) => shortcuts.attachGuest(window, guest, name))
     shortcuts.attach(window)
     window.on('focus', automaticCheck)
-    // Linux has no background tray; closing requests application shutdown.
+    // Without a Linux tray, closing must not leave an inaccessible background process.
     window.on('close', (event) => {
       if (quitting || shellInstallerOwnsQuit || sessionEnding) return
       event.preventDefault()
       if (updateDialog.isOpen) { updateDialog.focus(); return }
-      if (process.platform === 'linux') { app.quit(); return }
+      if (process.platform === 'linux' && tray === undefined) { app.quit(); return }
       const hide = (): void => {
         if (!quitting && !shellInstallerOwnsQuit && !sessionEnding && !window.isDestroyed()) hideMainWindow(window)
       }
@@ -1133,6 +1139,11 @@ async function main(): Promise<void> {
         skip: enterWorkspace,
       })
       const window = welcomeWindow
+      if (process.platform === 'linux') window.on('close', (event) => {
+        if (isQuitting() || sessionEnding || recovery.active || enteredWorkspace || tray === undefined) return
+        event.preventDefault()
+        window.hide()
+      })
       window.once('closed', () => {
         void welcomeBackend?.account.state().then((state) => {
           if (state.attempt !== null && !enteredWorkspace) return welcomeBackend?.account.cancel(state.attempt.id)

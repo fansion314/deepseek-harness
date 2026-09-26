@@ -176,15 +176,17 @@ const harness = await vi.hoisted(async () => {
   let accountListener: ((state: AccountView) => void) | undefined
   const nativeTheme = { themeSource: 'system', shouldUseDarkColors: false }
   const trays: FakeTray[] = []
+  let trayError: Error | undefined
   class FakeTray extends EventEmitter {
     readonly setToolTip = vi.fn()
     readonly setContextMenu = vi.fn()
     readonly destroy = vi.fn()
-    constructor(readonly image: unknown) { super(); trays.push(this) }
+    constructor(readonly image: unknown) { super(); if (trayError) throw trayError; trays.push(this) }
   }
   const backgroundNotice = { close: vi.fn((hide: () => void) => { hide() }), dispose: vi.fn(), markerPath: undefined as string | undefined }
   const shellDialog = { isOpen: false, focus: vi.fn() }
   return {
+    failTray(error: Error) { trayError = error },
     failWindow(error: Error) { windowFailure = error },
     windows, hosts, handlers, app, FakeWindow, FakeHost, powerMonitor, nativeTheme, trays, FakeTray, backgroundNotice, shellDialog,
     menu, popup, socketHeaders: vi.fn(), updateCheck, updateDownload, updateInstall,
@@ -228,6 +230,7 @@ const harness = await vi.hoisted(async () => {
       accountListener = undefined
       windows.length = 0; hosts.length = 0; handlers.clear(); app.removeAllListeners()
       trays.length = 0
+      trayError = undefined
       backgroundNotice.markerPath = undefined
       shellDialog.isOpen = false
       powerMonitor.removeAllListeners()
@@ -854,6 +857,12 @@ describe('desktop main startup', () => {
     const template = harness.menu.buildFromTemplate.mock.calls
       .map(call => call[0])
       .find(items => items.some(item => item.role === 'editMenu'))
+    if (platform === 'linux') {
+      expect(template).toBeUndefined()
+      expect(harness.menu.setApplicationMenu).toHaveBeenCalledWith(null)
+      expect(harness.trays).toHaveLength(1)
+      return
+    }
     if (template === undefined) throw new Error('application menu missing')
     expect(template.map(describeItem)).toEqual(platform === 'darwin'
       ? ['Desktop test', en.fileMenu, 'editMenu', 'windowMenu']
@@ -1124,10 +1133,16 @@ describe('desktop main startup', () => {
     expect(harness.trays[0]!.setContextMenu.mock.calls.length).toBe(relabels + 1)
   })
 
-  it('quits on Linux window close and waits for the Host to exit', async () => {
+  it('hides on Linux window close, reopens from the tray, and waits for the Host on explicit quit', async () => {
     vi.stubGlobal('process', { ...process, platform: 'linux' })
     const host = await readyWorkspace()
     harness.windows[0]!.close()
+    expect(harness.windows[0]!.hide).toHaveBeenCalledOnce()
+    expect(host.inspectQuit).not.toHaveBeenCalled()
+    expect(harness.app.quit).not.toHaveBeenCalled()
+    harness.trays[0]!.emit('click')
+    expect(harness.windows[0]!.show).toHaveBeenCalledTimes(2)
+    harness.app.quit()
     await vi.advanceTimersByTimeAsync(0)
     expect(host.inspectQuit).toHaveBeenCalledOnce()
     await host.stopping.promise
@@ -1135,6 +1150,19 @@ describe('desktop main startup', () => {
     expect(harness.dialog.showMessageBox).not.toHaveBeenCalled()
     host.exited.resolve()
     await harness.quitCompleted.promise
+  })
+
+  it('quits on Linux window close when the tray cannot be created', async () => {
+    vi.stubGlobal('process', { ...process, platform: 'linux' })
+    harness.failTray(new Error('tray unavailable'))
+    const host = await readyWorkspace()
+    harness.windows[0]!.close()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(host.inspectQuit).toHaveBeenCalledOnce()
+    await host.stopping.promise
+    host.exited.resolve()
+    await harness.quitCompleted.promise
+    expect(harness.trays).toHaveLength(0)
   })
 
   it('keeps the workspace visible while acknowledgement is pending and ignores a destroyed window', async () => {

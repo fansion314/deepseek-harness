@@ -54,6 +54,16 @@ async function bench(options: { locale?: 'en' } = {}) {
 }
 
 describe('sidebar shell snapshots', () => {
+  it('uses the configured product title in the sidebar', async () => {
+    vi.stubEnv('DSH_CLIENT_TITLE', 'DeepSeek Harness Desktop')
+    const { runtime } = await bench()
+    try {
+      const slot = runtime.renderSlot('sidebar', { collapsed: false, width: 300 })
+      expect(slot.view.getByText('DeepSeek Harness Desktop')).toBeTruthy()
+      expect(slot.view.queryByText('DSH 本地构建')).toBeNull()
+      expect(slot.container).toMatchSnapshot()
+    } finally { await runtime.dispose() }
+  })
   it('renders the expanded column in the default locale (zh, no setLocale)', async () => {
     const { runtime } = await bench()
     const slot = runtime.renderSlot('sidebar', { collapsed: false, width: 300 })

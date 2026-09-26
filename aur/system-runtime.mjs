@@ -18,12 +18,15 @@ export function prepareSystemRuntime(appRoot, cacheRoot) {
   const python = JSON.parse(execFileSync('/usr/bin/python', ['-I', '-B', '-c',
     'import importlib.metadata as m, json, platform, sys; import numpy, pandas, docx, pptx, openpyxl, PIL, lxml, xlsxwriter; print(json.dumps({"version": platform.python_version(), "packages": {n: m.version(n) for n in json.loads(sys.argv[1])}}))',
     JSON.stringify(distributions)], { encoding: 'utf8' }))
-  const node = execFileSync('/usr/bin/node', ['-p', 'process.versions.node'], { encoding: 'utf8' }).trim()
-  const pnpm = JSON.parse(readFileSync('/usr/lib/node_modules/pnpm/package.json', 'utf8')).version
+  const node = execFileSync('/usr/lib/electron44/electron', ['-p', 'process.versions.node'], {
+    encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+  }).trim()
+  const pnpmRoot = join(appRoot, 'runtime/pnpm')
+  const pnpm = JSON.parse(readFileSync(join(pnpmRoot, 'package.json'), 'utf8')).version
   const version = JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8')).version
   const manifest = { desktopVersion: version, platform: 'linux', arch: 'x64', python: python.version,
     node, pnpm, pythonPackages: python.packages }
-  const digest = createHash('sha256').update(JSON.stringify({ format: 1, appRoot: resolve(appRoot), manifest })).digest('hex')
+  const digest = createHash('sha256').update(JSON.stringify({ format: 2, appRoot: resolve(appRoot), manifest })).digest('hex')
   const destination = join(resolve(cacheRoot), digest)
   if (existsSync(join(destination, 'primary-runtime/runtime.json'))) return destination
   mkdirSync(cacheRoot, { recursive: true, mode: 0o700 })
@@ -32,11 +35,11 @@ export function prepareSystemRuntime(appRoot, cacheRoot) {
     const primary = join(staging, 'primary-runtime')
     const dependencies = join(primary, 'dependencies')
     mkdirSync(join(dependencies, 'node/bin'), { recursive: true })
-    symlinkSync('/usr/bin/node', join(dependencies, 'node/bin/node'))
-    symlinkSync('/usr/lib/node_modules', join(dependencies, 'node/node_modules'))
+    mkdirSync(join(dependencies, 'node/node_modules'))
+    symlinkSync(join(appRoot, 'runtime/bin/node'), join(dependencies, 'node/bin/node'))
     symlinkSync('/usr', join(dependencies, 'python'))
-    symlinkSync('/usr/lib/node_modules/pnpm', join(dependencies, 'pnpm'))
-    symlinkSync('/usr/lib/node_modules/pnpm', join(staging, 'pnpm'))
+    symlinkSync(pnpmRoot, join(dependencies, 'pnpm'))
+    symlinkSync(pnpmRoot, join(staging, 'pnpm'))
     symlinkSync(join(appRoot, 'runtime/bin'), join(staging, 'bin'))
     symlinkSync(join(appRoot, 'runtime/office-skills'), join(staging, 'office-skills'))
     writeFileSync(join(primary, 'runtime.json'), `${JSON.stringify({ ...manifest, payloadDigest: digest }, null, 2)}\n`)

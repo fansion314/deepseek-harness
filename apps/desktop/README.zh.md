@@ -4,7 +4,7 @@
 
 桌面应用是完整 dsh Web 应用外的一层 Electron 壳。Electron RunAsNode 子进程启动共享 profile runner，Electron 立即从 `dsh-app://app/` 加载打包内的 Web 入口。共享加载页等待 Host 启动注入，然后在同一文档中启动客户端。Electron 将应用 HTTP 请求转发给已认证的 Web Host，转发时丢弃描述 Node fetch 连接而非资源本身的响应头（`transfer-encoding`、`connection`、`keep-alive`），并把插件 bundle 响应标记为 `no-store`，因为其每次启动都变化的 revision 只会在 Chromium 磁盘缓存中累积；WebSocket 流连接到该 Host，仅为归属的应用窗口附加凭据。Node IPC 承载启动注入、就绪与关闭。Desktop 默认使用端口 `19387`，与 Web 的 `3080` 分开；可通过 `webserver.config.port` patch 覆盖。
 
-社区 Linux 软件包可在非打包启动时设置 `DSH_DESKTOP_HOST_NODE`，为 Host 和包操作选择独立的 Node 可执行文件。默认使用 Electron Node 模式。[Arch 打包](../../aur/README.zh.md)使用系统 Node，避免 Linux Electron 原生库冲突。其启动器设置 `DSH_DESKTOP_PRIMARY_RUNTIME_IN_PLACE=1`，让 Host 使用由 pacman 管理的解释器链接和当前 Python 分发包元数据，不将其复制到 Harness 主目录。
+社区 Linux 软件包可在非打包启动时设置 `DSH_DESKTOP_HOST_NODE`，为 Host 和包操作选择独立的 Node 可执行文件。默认使用 Electron Node 模式。[Arch 打包](../../aur/README.zh.md)使用 Electron Node 和系统 libvips。其启动器设置 `DSH_DESKTOP_PRIMARY_RUNTIME_IN_PLACE=1`，让 Host 使用由 pacman 管理的解释器链接和当前 Python 分发包元数据，不将其复制到 Harness 主目录。
 
 应用菜单第一项“**关于 DeepSeek Harness**”打开 Electron 原生关于面板，展示应用图标、产品名称和当前安装的发布版本。菜单文案跟随桌面壳的语言。macOS 的隐藏、隐藏其他、显示全部和退出条目使用本地化文案，隐藏和退出条目包含 DeepSeek Harness 产品名称。这些条目保留原生动作和快捷键。macOS 从应用包读取图标，因此未打包的开发启动会显示 Electron 图标；Windows 使用随包分发的 PNG。
 
@@ -26,7 +26,7 @@ Desktop Host 的 Platform API 请求与更新策略请求用相同的 Platform �
 
 ## 关闭窗口与退出
 
-在 Linux 上，关闭工作区会请求退出应用，因为桌面壳没有后台托盘。存在活动任务时仍使用下述退出确认。终端 SIGINT 和 SIGTERM 跳过确认，通过 IPC 停止 Host 后退出，不显示崩溃恢复弹窗；Linux Host 运行在独立进程组中，由桌面壳先处理终端信号。
+在 Linux 上，关闭工作区或欢迎窗口会隐藏到托盘，Host 继续运行。如果托盘创建失败，关闭窗口会请求退出应用，并使用下述退出确认。终端 SIGINT 和 SIGTERM 跳过确认，通过 IPC 停止 Host 后退出，不显示崩溃恢复弹窗；Linux Host 运行在独立进程组中，由桌面壳先处理终端信号。
 
 关闭主窗口（macOS 的关闭按钮和 ⌘W；Windows 的 ×、Alt+F4 和任务栏"关闭窗口"）会隐藏窗口；Windows 首次隐藏前需要确认。页面和 Host 继续运行，任务不受影响，下次显示时仍是原来的文档，会话、草稿和滚动位置都保留；macOS 全屏窗口先退出全屏再隐藏。macOS 通过 Dock 图标、再次启动或 `dsh://open` 找回窗口，Windows 通过托盘找回。最小化行为不变。进入工作区前关闭欢迎窗口，Windows 上走退出流程，macOS 上应用留在 Dock 中且没有窗口。
 
@@ -94,9 +94,9 @@ Electron 拥有 `$DSH_HOME/profiles/desktop`。其 `dependencies` 包含 pnpm �
 
 Electron 根据应用语言选择类型化的英文或中文 shell 文案，并回退到英文。macOS 应用包通过 `CFBundleLocalizations` 声明支持英语和简体中文，让 macOS 根据用户的首选语言匹配初始应用语言。主界面仍优先使用已保存的 Client UI 语言偏好。在 Windows 上，主文档的语言会更新桌面菜单、恢复与更新提示。仓库 Client UI i18n 检查覆盖桌面端源码。
 
-Windows 使用 40 DIP 顶栏，保留原生窗口按钮，颜色随应用调色板同步。侧栏开关旁的本地化“应用”和“编辑”入口打开原生弹出菜单。仅当应用框架发布 shell overlay 席位后才挂载菜单，启动加载期间不显示。“应用”提供检查更新和退出；“编辑”向当前编辑器发送对应按键，提供撤销、重做、剪切、复制、粘贴、删除和全选，不受自定义快捷键绑定影响。插件管理使用主应用的“插件”页面。按 Alt 不会出现额外的原生菜单行。其他平台保留原生菜单。可编辑区域保留快捷键和不带快捷键标注的右键菜单；命令可用状态由 Chromium 提供，选中的只读文本提供“复制”命令。
+Windows 使用 40 DIP 顶栏，保留原生窗口按钮，颜色随应用调色板同步。侧栏开关旁的本地化“应用”和“编辑”入口打开原生弹出菜单。仅当应用框架发布 shell overlay 席位后才挂载菜单，启动加载期间不显示。“应用”提供检查更新和退出；“编辑”向当前编辑器发送对应按键，提供撤销、重做、剪切、复制、粘贴、删除和全选，不受自定义快捷键绑定影响。插件管理使用主应用的“插件”页面。按 Alt 不会出现额外的原生菜单行。macOS 保留原生菜单。可编辑区域保留快捷键和不带快捷键标注的右键菜单；命令可用状态由 Chromium 提供，选中的只读文本提供“复制”命令。
 
-macOS 上自定义菜单保留 Electron 的标准 Window 菜单及应用隐藏命令，包括 Minimize（⌘M）和 Hide（⌘H）。Linux 保留应用菜单和 Edit 菜单。
+macOS 上自定义菜单保留 Electron 的标准 Window 菜单及应用隐藏命令，包括 Minimize（⌘M）和 Hide（⌘H）。Linux 移除菜单栏，将应用操作放入托盘右键菜单；激活托盘可恢复窗口。托盘激活手势由桌面环境决定。
 
 ### 运行时与插件激活
 
@@ -120,7 +120,7 @@ macOS 上自定义菜单保留 Electron 的标准 Window 菜单及应用隐藏�
 
 ## 开发
 
-开发环境应用菜单提供“刷新页面”（macOS 为 Cmd+R，其他平台为 Ctrl+R）和“重启应用与 Host”。重启会等待 Host 关闭，再重新启动 Electron 和新的 Host；这两项操作都不会重新构建源码。
+开发环境应用菜单（Linux 为托盘菜单）提供“刷新页面”（macOS 为 Cmd+R，Windows 为 Ctrl+R）和“重启应用与 Host”。重启会等待 Host 关闭，再重新启动 Electron 和新的 Host；这两项操作都不会重新构建源码。
 
 `dev:desktop` 会构建当前 Host、客户端 bundle、Web 前端和 Electron 壳，把已构建的 CLI 包、私有 Desktop Host 包及其 workspace 依赖投影为一次性桌面 npm 项目，然后直接启动 Electron；这条路径不从 npm 解析 dsh：
 

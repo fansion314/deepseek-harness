@@ -16,7 +16,7 @@ let exited
 let child
 
 async function launch() {
-  application = await electron.launch({ executablePath: resolve(appRoot, '../../bin/dsh-electron'),
+  application = await electron.launch({ executablePath: resolve(appRoot, '../../bin/dsh-desktop'),
     args: [`--user-data-dir=${join(scratch, 'chromium')}`, '--lang=en-US'], timeout: 60_000,
     env: { ...env, DSH_HOME: join(scratch, 'dsh'), DSH_AGENTS_HOME: join(scratch, 'agents'), XDG_CACHE_HOME: join(scratch, 'cache') } })
   child = application.process()
@@ -26,6 +26,11 @@ async function launch() {
       predicate: async page => { await page.waitForURL('**/renderer/welcome.html', { timeout: 60_000 }); return true },
       timeout: 60_000,
     })
+  const welcomeWindow = await application.browserWindow(welcome)
+  await welcomeWindow.evaluate(owner => { owner.close() })
+  assert.equal(await welcomeWindow.evaluate(owner => owner.isVisible()), false)
+  await application.evaluate(({ app }) => { app.emit('activate', {}, false) })
+  assert.equal(await welcomeWindow.evaluate(owner => owner.isVisible()), true)
   await welcome.locator('#api-key').click()
   await welcome.locator('#skip-key').click()
   const main = application.windows().find(page => page.url().startsWith('dsh-app://app/'))
@@ -57,7 +62,13 @@ async function hostPids() {
   const pids = (await readFile(`/proc/${child.pid}/task/${child.pid}/children`, 'utf8')).trim().split(/\s+/).filter(Boolean)
   const hosts = []
   for (const pid of pids) {
-    try { if (await readlink(`/proc/${pid}/exe`) === '/usr/bin/node') hosts.push(Number(pid)) }
+    try {
+      const args = await readFile(`/proc/${pid}/cmdline`, 'utf8')
+      if (args.includes('/dsh-desktop-host/')) {
+        assert.equal(await readlink(`/proc/${pid}/exe`), '/usr/lib/electron44/electron')
+        hosts.push(Number(pid))
+      }
+    }
     catch (error) { if (error.code !== 'ENOENT') throw error }
   }
   assert.equal(hosts.length, 1)
@@ -66,6 +77,9 @@ async function hostPids() {
 
 try {
   const main = await launch()
+  assert.equal(await main.title(), 'DeepSeek Harness Desktop')
+  await main.getByText('DeepSeek Harness Desktop', { exact: true }).waitFor()
+  assert.equal(await application.evaluate(({ Menu }) => Menu.getApplicationMenu()), null)
   await main.getByRole('button', { name: 'Account menu', exact: true }).click()
   await main.getByRole('menuitem', { name: 'Settings', exact: true }).click()
   const dialog = main.getByRole('dialog', { name: 'Settings', exact: true })
@@ -99,8 +113,13 @@ try {
   await main.keyboard.press('Escape')
   const window = await application.browserWindow(main)
   await window.evaluate(owner => { owner.close() })
+  assert.equal(await window.evaluate(owner => owner.isVisible()), false)
+  for (const pid of hosts) assert.equal(existsSync(`/proc/${pid}`), true, 'Host survives hiding the window')
+  await application.evaluate(({ app }) => { app.emit('activate', {}, false) })
+  assert.equal(await window.evaluate(owner => owner.isVisible()), true)
+  await application.evaluate(({ app }) => { app.quit() })
   await waitForExit()
-  for (const pid of hosts) assert.equal(existsSync(`/proc/${pid}`), false, 'Host exited after window close')
+  for (const pid of hosts) assert.equal(existsSync(`/proc/${pid}`), false, 'Host exited after explicit quit')
   application = undefined
 
   await launch()
@@ -114,7 +133,7 @@ try {
   await waitForExit()
   for (const pid of restartedHosts) assert.equal(existsSync(`/proc/${pid}`), false, 'Host exited after terminal SIGINT')
   application = undefined
-  console.log('Arch desktop: scale persisted; Linux window close and terminal SIGINT exited cleanly with no remaining Host')
+  console.log('Arch desktop: branding, no menu bar, hide/reopen, Electron Host, scale persistence and clean quit/SIGINT verified')
 } finally {
   try {
     if (application) {

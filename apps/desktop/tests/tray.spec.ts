@@ -70,3 +70,17 @@ it('relabels the menu in the current locale and ignores relabel after disposal',
   f.tray.relabel()
   expect(native.menus).toHaveLength(2)
 })
+
+it('includes application actions and rebuilds them when the locale changes', () => {
+  let locale = resolveDesktopLocale('en')
+  const reload = vi.fn()
+  const tray = new DesktopTray({ iconPath: 'icon.png', locale: () => locale, open: vi.fn(), quit: vi.fn(),
+    applicationItems: () => [{ label: locale.messages.reloadPageMenu, click: reload }, { type: 'separator' }] })
+  expect(labels(native.menus[0]!)).toEqual(['Open DeepSeek Harness', 'separator', 'Reload Page', 'separator', 'Quit DeepSeek Harness'])
+  ;(native.menus[0]![2] as { click: () => void }).click()
+  expect(reload).toHaveBeenCalledOnce()
+  locale = resolveDesktopLocale('zh')
+  tray.relabel()
+  expect(labels(native.menus[1]!)).toContain('刷新页面')
+  tray.dispose()
+})

@@ -1,24 +1,26 @@
-/** Windows system tray: the always-present way back to a hidden window and the explicit quit entry. */
+/** System tray: access to the hidden window and application actions. */
 
-import { Menu, nativeImage, Tray } from 'electron'
+import { Menu, nativeImage, Tray, type MenuItemConstructorOptions } from 'electron'
 import type { DesktopLocale } from './locale.ts'
 
 /** Main-process actions the tray triggers; both run the same paths as the window and application menu. */
 export interface DesktopTrayOptions {
-  /** Multi-size ICO rendered by `scripts/render-tray-icon.ts`; Windows picks the bitmap for the display scale. */
+  /** Platform icon: a multi-size ICO on Windows or a PNG on Linux. */
   readonly iconPath: string
   readonly locale: () => DesktopLocale
   /** Show and focus the primary window. */
   readonly open: () => void
   /** Request quit through the same confirmation as every other quit entry. */
   readonly quit: () => void
+  /** Additional application actions, rebuilt when the locale changes. */
+  readonly applicationItems?: () => MenuItemConstructorOptions[]
 }
 
 /** Tray icon present for the whole run, not only while the window is hidden. */
 export class DesktopTray {
   private tray: Tray | undefined
 
-  /** @param options - Icon path, locale reader, and the open and quit actions. */
+  /** @param options - Icon path, locale reader, and application actions. */
   constructor(private readonly options: DesktopTrayOptions) {
     const tray = new Tray(nativeImage.createFromPath(options.iconPath))
     this.tray = tray
@@ -35,6 +37,7 @@ export class DesktopTray {
     tray.setContextMenu(Menu.buildFromTemplate([
       { label: messages.openApplication, click: () => { this.options.open() } },
       { type: 'separator' },
+      ...this.options.applicationItems?.() ?? [],
       { label: messages.quitApplication, click: () => { this.options.quit() } },
     ]))
   }

@@ -1,14 +1,14 @@
 # Maintainer: fansion314 <https://github.com/fansion314>
 pkgname=dsh-electron-bin
 pkgver=0.1.7rc.2
-pkgrel=1
+pkgrel=2
 _version=0.1.7-rc.2
 _tag=arch-v${_version}-${pkgrel}
 pkgdesc='DeepSeek Harness desktop using system Electron (prebuilt)'
 arch=('x86_64')
 url='https://github.com/fansion314/deepseek-harness'
 license=('MIT')
-depends=('electron44' 'nodejs>=24' 'pnpm' 'python' 'python-numpy' 'python-pandas'
+depends=('electron44' 'libvips' 'python' 'python-numpy' 'python-pandas'
          'python-docx' 'python-pptx' 'python-openpyxl' 'python-pillow' 'python-lxml'
          'python-xlsxwriter' 'python-tzdata' 'python-dateutil' 'python-six'
          'python-typing_extensions' 'python-et-xmlfile' 'ripgrep' 'gcc-libs' 'glibc' 'xdg-utils')
@@ -17,10 +17,10 @@ conflicts=('dsh-electron')
 options=('!strip')
 source=("${url}/releases/download/${_tag}/dsh-electron-${_version}-${pkgrel}-x86_64.tar.zst")
 # Refreshed with the verified artifact digest by aur/prepare-release.sh.
-sha256sums=('15e0daa8348d0c70998517d45c15521e6959a82971b4032292a2104d4a351394')
+sha256sums=('058e01f8438e52b01f57373f23982c7f2aeb99c302e283f69846f91dd3ce5f01')
 
 package() {
   cp -a usr "$pkgdir/"
-  chmod 755 "$pkgdir/usr/bin/dsh-electron"
+  chmod 755 "$pkgdir/usr/bin/dsh-desktop"
   mv "$pkgdir/usr/share/licenses/dsh-electron" "$pkgdir/usr/share/licenses/$pkgname"
 }
