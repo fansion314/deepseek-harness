@@ -21,7 +21,7 @@ GitHub 发行版包含可安装的 `.pkg.tar.zst` 文件、SHA-256 清单，以�
 
 ## 发行构建 {#release-builds}
 
-[工作流](../.github/workflows/arch-release.yml) 在 Arch 容器内以非特权用户构建。推送 `arch-v<upstream-version>-<pkgrel>` 标签后，运行检查和打包成功才会发布预发行版。手动运行仅生成 Actions 构建产物，不发布发行版。打标签前，两个配方的版本和发行编号必须一致。
+[工作流](../.github/workflows/arch-release.yml) 在 Arch 容器内以非特权用户构建。它使用固定的 AUR 配方构建官方仓库中缺失的 `python-pptx`；本地安装需要该 AUR 依赖，或由已配置仓库提供的等效软件包。推送 `arch-v<upstream-version>-<pkgrel>` 标签后，运行检查和打包成功才会发布预发行版。手动运行仅生成 Actions 构建产物，不发布发行版。打标签前，两个配方的版本和发行编号必须一致。
 
 构建使用仓库固定的 pnpm，编译桌面端和 Web 前端，并部署生产 JavaScript 依赖。运行时解释器和 Python 库由 pacman 提供。发布前执行原生模块、PTY、搜索、Host、前端、Office 转换和 Electron 窗口检查。发行配方写入实际归档校验和并生成 `.SRCINFO`；提交到 AUR 前，仓库内二进制配方必须与发布归档一致。
 

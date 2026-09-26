@@ -21,7 +21,7 @@ The desktop command is `dsh-desktop`; the sidebar, window title, and application
 
 ## Release builds
 
-The [workflow](../.github/workflows/arch-release.yml) builds in an Arch container as an unprivileged user. An `arch-v<upstream-version>-<pkgrel>` tag publishes a prerelease after runtime checks and packaging succeed. Manual runs create Actions artifacts without publishing. Both recipes must have matching versions and release numbers before tagging.
+The [workflow](../.github/workflows/arch-release.yml) builds in an Arch container as an unprivileged user. It builds a pinned AUR recipe for `python-pptx`, which is absent from the official repositories; local installations need that AUR dependency or an equivalent package from a configured repository. An `arch-v<upstream-version>-<pkgrel>` tag publishes a prerelease after runtime checks and packaging succeed. Manual runs create Actions artifacts without publishing. Both recipes must have matching versions and release numbers before tagging.
 
 The build uses the repository's pinned pnpm, compiles the desktop and Web frontend, and deploys production JavaScript dependencies. Runtime interpreters and Python libraries come from pacman. Native-module, PTY, search, Host, frontend, Office-conversion, and Electron-window checks run before publication. Release recipes receive the actual archive checksum and generated `.SRCINFO`; the checked-in binary recipe must match the published archive before AUR submission.
 
