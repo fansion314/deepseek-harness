@@ -58,7 +58,7 @@ jobs:
           node --test aur/system-runtime.test.mjs
           DSH_CLIENT_TITLE='DeepSeek Harness Desktop' pnpm run build
           pnpm exec tsx aur/build.ts
-          dbus-run-session -- xvfb-run -a node aur/smoke-shell.mjs
+          dbus-run-session -- xvfb-run -d -s '-screen 0 1920x1080x24' node aur/smoke-shell.mjs
           desktop-file-validate aur/dsh-electron.desktop
           BUILD
 
