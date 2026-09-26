@@ -56,8 +56,9 @@ jobs:
           export DSH_ARCH_PKGREL="$pkgrel"
           pnpm install --frozen-lockfile
           node --test aur/system-runtime.test.mjs
-          DSH_CLIENT_TITLE='DeepSeek Harness Desktop' pnpm run build
+          DSH_CLIENT_TITLE='DeepSeek Harness' pnpm run build
           pnpm exec tsx aur/build.ts
+          node aur/smoke-cli.mjs
           dbus-run-session -- xvfb-run -d -s '-screen 0 1920x1080x24' node aur/smoke-shell.mjs
           desktop-file-validate aur/dsh-electron.desktop
           BUILD

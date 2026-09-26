@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=DeepSeek Harness Desktop
+Name=DeepSeek Harness
 Comment=DeepSeek Harness desktop application
 Exec=dsh-desktop %U
 Icon=dsh-electron

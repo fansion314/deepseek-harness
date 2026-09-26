@@ -3,7 +3,7 @@ import { WINDOWS_TITLEBAR_HEIGHT } from '../src/windows-layout.ts'
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import type { MenuItemConstructorOptions, MessageBoxOptions } from 'electron'
 import { DESKTOP_IPC, type DesktopUpdateState } from '../src/ipc.ts'
@@ -94,6 +94,10 @@ const harness = await vi.hoisted(async () => {
     readonly restore = vi.fn()
     readonly setSize = vi.fn()
     readonly getBounds = vi.fn(() => ({ x: 0, y: 0, width: 800, height: 700 }))
+    readonly getNormalBounds = this.getBounds
+    maximized = false
+    isMaximized() { return this.maximized }
+    readonly maximize = vi.fn(() => { this.maximized = true; this.emit('maximize') })
     readonly setMinimumSize = vi.fn()
     readonly setTitleBarOverlay = vi.fn()
     readonly setVibrancy = vi.fn()
@@ -270,6 +274,7 @@ vi.mock('electron', () => ({
   dialog: harness.dialog,
   shell: { openExternal: harness.openExternal },
   nativeTheme: harness.nativeTheme,
+  screen: { getPrimaryDisplay: () => ({ workAreaSize: { width: 1920, height: 1080 } }) },
   net: { fetch: vi.fn() },
   ipcMain: {
     on: harness.ipcOn,
@@ -303,6 +308,10 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   }) }
 })
 vi.mock('../src/runtime-tree.ts', () => ({ readDesktopRuntime: () => ({ release: { version: '1.0.0' } }) }))
+vi.mock('../src/window-state.ts', async (importOriginal) => {
+  const { DesktopWindowState } = await importOriginal<typeof import('../src/window-state.ts')>()
+  return { DesktopWindowState: class extends DesktopWindowState { override save = async () => {} } }
+})
 vi.mock('../src/paths.ts', () => ({ resolveDesktopPaths: () => ({ profile: 'desktop-test-profile' }) }))
 vi.mock('../src/project-manager.ts', () => ({
   DesktopProjectManager: class {
@@ -420,6 +429,17 @@ afterEach(async () => {
 })
 
 describe('desktop main startup', () => {
+  it('restores saved dimensions and maximizes only when the workspace is shown', async () => {
+    writeFileSync(join(harness.app.getPath('userData'), 'window-state.json'),
+      JSON.stringify({ width: 1440, height: 900, maximized: true }))
+    await readyWorkspace()
+    const window = harness.windows[0]!
+    expect(window.options).toMatchObject({ width: 1440, height: 900 })
+    expect(window.maximize).not.toHaveBeenCalled()
+    window.emit('show')
+    expect(window.maximize).toHaveBeenCalledOnce()
+  })
+
   it('routes shell update documents and assets through the registered main protocol handler', async () => {
     const root = join(import.meta.dirname, '..')
     vi.spyOn(harness.app, 'getAppPath').mockReturnValue(root)

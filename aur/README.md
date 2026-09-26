@@ -17,7 +17,9 @@ English | [中文](README.zh.md)
 
 The GitHub release includes installable `.pkg.tar.zst` files, a SHA-256 manifest, and AUR recipe archives containing `PKGBUILD` and `.SRCINFO`. The binary recipe verifies the application archive before packaging it. The recipes are prepared for AUR submission; the workflow does not upload them to aur.archlinux.org.
 
-The desktop command is `dsh-desktop`; the sidebar, window title, and application menu entry use DeepSeek Harness Desktop. The packages conflict with each other. Application updates use pacman or an AUR helper; the upstream in-app updater is inactive. System Electron reads `~/.config/electron44-flags.conf` (or `electron-flags.conf`) for display and Chromium options.
+The desktop command is `dsh-desktop`; the sidebar, window title, and application menu entry use DeepSeek Harness. The packages conflict with each other. Application updates use pacman or an AUR helper; the upstream in-app updater is inactive. System Electron reads `~/.config/electron44-flags.conf` (or `electron-flags.conf`) for display and Chromium options.
+
+The package also installs `dsh`, using the same-version upstream CLI and bundled pnpm under Electron Node. `dsh web --host 127.0.0.1 --port 0 --no-open` serves the Web UI without opening a browser. The CLI retains the `headless`, `sdk`, `sdk-minimal`, and `acp` profiles, configuration export, and `dsh plugin --profile <name> ...` package management. Model requests still require provider credentials. CLI profiles and the reserved Desktop profile use their own configuration and plugin installations; window and tray integration belong to `dsh-desktop`.
 
 ## Release builds
 
@@ -47,10 +49,12 @@ The DSH-specific `libreoffice-kit-wasm` engine remains bundled: document preview
 
 ## Runtime
 
-Resources live under `/usr/lib/dsh-electron`. The launcher selects the existing unpackaged Desktop resource inputs and disables development tools. User profiles remain in the normal DSH home. Electron 44 is versioned separately so an upgrade of Arch's latest-electron metapackage cannot silently switch the application to a new major release.
+Resources live under `/usr/lib/dsh-electron`. The launcher uses Desktop's configurable resource paths and disables development tools. User profiles remain in the normal DSH home. Electron 44 is versioned separately so an upgrade of Arch's latest-electron metapackage cannot silently switch the application to a new major release.
 
 The launcher uses Electron Node for Host, package operations, and the primary JavaScript runtime. It reads current system Python distribution versions and creates only metadata and links under `${XDG_CACHE_HOME:-~/.cache}/dsh-electron/runtimes`. The Host uses these dependencies in place; it does not copy `/usr` or interpreters into `~/.dsh`. Metadata is refreshed after system versions change. Missing dependencies stop startup with an error. System Python follows Arch's externally managed environment policy; install additional system libraries with pacman or use a workspace virtual environment.
 
 Linux keeps an application tray icon. Activating it restores the window; its context menu contains Open, About, Check for Updates, Reload Page, Restart App and Host, and Quit. Closing the workspace or welcome window hides it while tasks continue. A desktop environment with a system tray is required. If tray creation fails, closing exits instead. Linux tray activation follows the desktop environment and may require a double click.
 
 The Arch build applies a small [compatibility patch](require-builtin.patch) to the deployed internal-module helper: an explicit `--expose-internals` uses Node’s builtin loader without probing Electron’s V8 memory layout. Workspace and upstream dependency sources remain unchanged. Runtime smoke checks exercise this helper and the rebuilt sharp addon under the installed Electron version.
+
+Application JavaScript, frontend assets, and the dsh dependency tree are stored in `app.asar`. The adjacent `app.asar.unpacked` holds native libraries, executable helpers, and the complete Office package closure using the upstream Desktop exclusions. pnpm, its Node launcher, and Office skill resources stay in `runtime/` because external processes need real paths. ASAR is an archive, not compression; user profiles, plugin installation directories, and workspaces remain writable outside it. Packaging verifies the archived Host, native modules, frontend, plugin loading, PTY, search, package scripts, and Office conversion before release.

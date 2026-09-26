@@ -5,9 +5,9 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import { prepareOfficeSkillAssets } from '../scripts/primary-runtime/prepare.ts'
 import { prepareSystemRuntime } from './system-runtime.mjs'
 import { buildSystemSharp } from './build-sharp.mjs'
+import { packDesktopAsar } from './pack-asar.mjs'
 import { writeDesktopRuntime, verifyDesktopRuntime } from '../apps/desktop/src/runtime-tree.ts'
 import { DESKTOP_HOST_PROTOCOL_VERSION } from '../apps/desktop/src/host-protocol.ts'
-import { smokeDesktopRuntime } from '../apps/desktop/scripts/smoke-runtime.ts'
 import { desktopRuntimeFileExclusion } from '../apps/desktop/scripts/runtime-file-policy.ts'
 
 const root = resolve(import.meta.dirname, '..')
@@ -99,17 +99,18 @@ const appManifest = JSON.parse(readFileSync(join(app, 'package.json'), 'utf8'))
 appManifest.main = 'entry.cjs'
 writeFileSync(join(app, 'package.json'), `${JSON.stringify(appManifest, null, 2)}\n`)
 copy('apps/desktop/resources', join(app, 'resources'))
-copy('apps/desktop/scripts/node-bin', join(app, 'scripts/node-bin'))
 copy('apps/desktop/scripts/node-bin', join(runtime, 'bin'))
 copy('aur/node', join(runtime, 'bin/node'))
+copy('aur/asar-paths.mjs', join(runtime, 'asar-paths.mjs'))
 chmodSync(join(runtime, 'bin/node'), 0o755)
+copy('aur/pnpm', join(runtime, 'bin/pnpm'))
+chmodSync(join(runtime, 'bin/pnpm'), 0o755)
 copy('apps/desktop/node_modules/pnpm', join(runtime, 'pnpm'))
 buildSystemSharp(join(dsh, 'node_modules'))
 run('patch', ['--batch', '--forward', '-p1', '-d', join(dsh, 'node_modules/node-addon-require-builtin'),
   '-i', join(root, 'aur/require-builtin.patch')])
 await prepareOfficeSkillAssets(resolve('packages/skill/skill-office/assets'), join(runtime, 'office-skills'))
 const systemRuntime = prepareSystemRuntime(app, join(work, 'system-runtimes'))
-const hostNode = electron
 const sharedNames = readdirSync(join(dsh, 'node_modules/@deepseek-ai')).map(name => `@deepseek-ai/${name}`)
 const ripgrep = join(dsh, 'node_modules/@vscode/ripgrep-linux-x64/bin/rg')
 writeFileSync(ripgrep, '#!/bin/sh\nexec /usr/bin/rg "$@"\n', { mode: 0o755 })
@@ -118,13 +119,15 @@ const pnpmVersion = JSON.parse(readFileSync(join(runtime, 'pnpm/package.json'), 
 const release = { schemaVersion: 1 as const, version, hostProtocolVersion: DESKTOP_HOST_PROTOCOL_VERSION,
   nodeVersion: versions.node, pnpmVersion }
 writeDesktopRuntime(dsh, release, sharedNames)
-const descriptor = await verifyDesktopRuntime(dsh, version)
+await verifyDesktopRuntime(dsh, version)
+await packDesktopAsar(app, join(work, 'asar-input'))
 const smokeEnvironment = { ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !/(?:KEY|SECRET|TOKEN|PASSWORD)/iu.test(name))),
   DSH_DESKTOP_PRIMARY_RUNTIME_IN_PLACE: '1', ELECTRON_RUN_AS_NODE: '1' }
-run(hostNode, ['--expose-internals', 'apps/desktop/tests/fixtures/runtime-payload-smoke.mjs', dsh, systemRuntime], smokeEnvironment)
-await smokeDesktopRuntime(dsh, hostNode, descriptor, smokeEnvironment, systemRuntime)
+run(electron, ['--expose-internals', '--import', 'tsx/esm', 'aur/smoke-asar.ts', app, systemRuntime, version], smokeEnvironment)
 copy('aur/dsh-electron.sh', join(payload, 'usr/bin/dsh-desktop'))
 chmodSync(join(payload, 'usr/bin/dsh-desktop'), 0o755)
+copy('aur/dsh', join(payload, 'usr/bin/dsh'))
+chmodSync(join(payload, 'usr/bin/dsh'), 0o755)
 copy('aur/dsh-electron.desktop', join(payload, 'usr/share/applications/dsh-electron.desktop'))
 copy('apps/desktop/resources/icon.svg', join(payload, 'usr/share/icons/hicolor/scalable/apps/dsh-electron.svg'))
 copy('LICENSE', join(payload, 'usr/share/licenses/dsh-electron/LICENSE'))

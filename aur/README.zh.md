@@ -17,7 +17,9 @@
 
 GitHub 发行版包含可安装的 `.pkg.tar.zst` 文件、SHA-256 清单，以及包含 `PKGBUILD` 和 `.SRCINFO` 的 AUR 配方归档。二进制配方在打包前校验应用归档。这些配方已准备供 AUR 提交使用；工作流不会向 aur.archlinux.org 上传。
 
-桌面启动命令为 `dsh-desktop`；侧栏、窗口标题和应用菜单名称为 DeepSeek Harness Desktop。两个软件包相互冲突。应用通过 pacman 或 AUR 助手更新；上游应用内更新器处于停用状态。系统 Electron 从 `~/.config/electron44-flags.conf`（或 `electron-flags.conf`）读取显示和 Chromium 选项。
+桌面启动命令为 `dsh-desktop`；侧栏、窗口标题和应用菜单名称为 DeepSeek Harness。两个软件包相互冲突。应用通过 pacman 或 AUR 助手更新；上游应用内更新器处于停用状态。系统 Electron 从 `~/.config/electron44-flags.conf`（或 `electron-flags.conf`）读取显示和 Chromium 选项。
+
+软件包同时安装 `dsh`，使用同版本上游 CLI，并通过 Electron Node 运行内置 pnpm。`dsh web --host 127.0.0.1 --port 0 --no-open` 启动 Web 界面但不自动打开浏览器。CLI 保留 `headless`、`sdk`、`sdk-minimal` 和 `acp` profile、配置导出，以及 `dsh plugin --profile <name> ...` 包管理功能。模型请求仍需要模型提供方凭据。CLI profile 与保留的 Desktop profile 各自使用配置和插件安装目录；窗口与托盘集成由 `dsh-desktop` 提供。
 
 ## 发行构建 {#release-builds}
 
@@ -47,10 +49,12 @@ DSH 专用的 `libreoffice-kit-wasm` 引擎仍随包提供：文档预览和转�
 
 ## 运行环境 {#runtime}
 
-资源位于 `/usr/lib/dsh-electron`。启动器选择已有的非打包桌面资源入口，并关闭开发者工具。用户配置仍保存在常规 DSH 主目录。Electron 44 采用独立版本的软件包，因此 Arch 最新 Electron 元软件包升级时，不会将应用静默切换至新的主版本。
+资源位于 `/usr/lib/dsh-electron`。启动器使用 Desktop 可配置的资源路径，并关闭开发者工具。用户配置仍保存在常规 DSH 主目录。Electron 44 采用独立版本的软件包，因此 Arch 最新 Electron 元软件包升级时，不会将应用静默切换至新的主版本。
 
 启动器使用 Electron Node 运行 Host、包操作和主 JavaScript 运行时。它读取当前系统 Python 分发包版本，仅在 `${XDG_CACHE_HOME:-~/.cache}/dsh-electron/runtimes` 下创建元数据和链接。Host 就地使用这些依赖，不将 `/usr` 或解释器复制到 `~/.dsh`。系统版本变化后更新元数据。缺少依赖时启动会报错。系统 Python 遵循 Arch 的外部管理环境策略；额外的系统库通过 pacman 安装，也可使用工作区虚拟环境。
 
 Linux 常驻应用托盘图标。激活图标可恢复窗口；右键菜单提供打开、关于、检查更新、刷新页面、重启应用与 Host 以及退出。关闭工作区或欢迎窗口会隐藏窗口，任务继续运行。桌面环境需支持系统托盘。如果托盘创建失败，关闭窗口则退出。Linux 托盘激活动作由桌面环境决定，可能需要双击。
 
 Arch 构建对部署后的内部模块辅助包应用一个小型[兼容补丁](require-builtin.patch)：显式传入 `--expose-internals` 时使用 Node 内置加载器，无需探测 Electron 的 V8 内存布局。工作区和上游依赖源码保持不变。运行时冒烟检查使用已安装的 Electron 版本验证该辅助包和重编译的 sharp 扩展。
+
+应用 JavaScript、前端资源和 dsh 依赖树存放在 `app.asar` 中。相邻的 `app.asar.unpacked` 按上游 Desktop 的排除规则保留原生库、可执行辅助程序和完整的 Office 包依赖。pnpm、其 Node 启动器和 Office 技能资源保留在 `runtime/`，因为外部进程需要真实路径。ASAR 只做归档，不负责压缩；用户配置、插件安装目录和工作区仍在归档外可写。打包流程会在发布前验证归档中的 Host、原生模块、前端、插件加载、PTY、搜索、包脚本和 Office 转换。

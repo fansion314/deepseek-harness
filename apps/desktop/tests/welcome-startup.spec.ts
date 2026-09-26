@@ -67,6 +67,7 @@ vi.mock('electron', () => ({
     exit: vi.fn(),
   },
   powerMonitor: { on: vi.fn(), off: vi.fn() },
+  screen: { getPrimaryDisplay: () => ({ workAreaSize: { width: 1920, height: 1080 } }) },
   BrowserWindow: class {
     constructor(options: BrowserWindowConstructorOptions) { state.windowOptions = options }
     private ready: (() => void) | undefined
@@ -139,7 +140,9 @@ vi.mock('../src/welcome-backend.ts', () => ({
 }))
 vi.mock('node:fs/promises', async importOriginal => ({
   ...await importOriginal<typeof import('node:fs/promises')>(),
-  readFile: vi.fn(async (path: unknown) => String(path).endsWith('interface-scale.json') ? '{"factor":1}' : '{}'),
+  readFile: vi.fn(async (path: unknown) => String(path).endsWith('window-state.json')
+    ? '{"width":1280,"height":820,"maximized":false}'
+    : String(path).endsWith('interface-scale.json') ? '{"factor":1}' : '{}'),
 }))
 vi.mock('../src/update-dialog.ts', () => ({ DesktopUpdateDialog: class {
   constructor(_preload: string, locale: () => DesktopLocale) { state.dialogLocale = locale }

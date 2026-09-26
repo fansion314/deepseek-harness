@@ -1,7 +1,7 @@
 # Maintainer: fansion314 <https://github.com/fansion314>
 pkgname=dsh-electron
 pkgver=0.1.7rc.2
-pkgrel=4
+pkgrel=5
 _version=0.1.7-rc.2
 _tag=arch-v${_version}-${pkgrel}
 pkgdesc='DeepSeek Harness desktop using system Electron'
@@ -26,7 +26,7 @@ prepare() {
 
 build() {
   cd deepseek-harness
-  DSH_CLIENT_TITLE='DeepSeek Harness Desktop' pnpm run build
+  DSH_CLIENT_TITLE='DeepSeek Harness' pnpm run build
   DSH_ARCH_PKGREL="$pkgrel" pnpm exec tsx aur/build.ts
 }
 

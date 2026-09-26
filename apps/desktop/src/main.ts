@@ -17,12 +17,14 @@ import {
   nativeTheme,
   net,
   protocol,
+  screen,
   session,
   shell,
   type IpcMainInvokeEvent,
   type MenuItemConstructorOptions,
 } from 'electron'
 import { resolveDesktopPaths } from './paths.ts'
+import { DesktopWindowState } from './window-state.ts'
 import { DesktopProjectManager } from './project-manager.ts'
 import { DesktopHostFatalError, DesktopHostProcess, DesktopHostUncleanExitError } from './host-process.ts'
 import { DesktopPlatformView, PLATFORM_IPC, platformBounds } from './platform-view.ts'
@@ -150,7 +152,8 @@ interface RuntimeResources {
 function runtimeResources(): RuntimeResources {
   const development = !app.isPackaged
   const node = (development ? process.env.DSH_DESKTOP_HOST_NODE : undefined) ?? process.execPath
-  const nodeBin = development ? join(app.getAppPath(), 'scripts', 'node-bin') : join(process.resourcesPath, 'runtime', 'bin')
+  const nodeBin = development ? process.env.DSH_DESKTOP_NODE_BIN ?? join(app.getAppPath(), 'scripts', 'node-bin')
+    : join(process.resourcesPath, 'runtime', 'bin')
   const pnpm = (development ? process.env.DSH_DESKTOP_PNPM_ENTRY : undefined)
     ?? (development ? join(app.getAppPath(), 'node_modules', 'pnpm', 'bin', 'pnpm.mjs')
       : join(process.resourcesPath, 'runtime', 'pnpm', 'bin', 'pnpm.mjs'))
@@ -202,10 +205,9 @@ function platformLoginUrl(authorizeUrl: string): string {
   return url.href
 }
 
-function createWindow(preload: string, show = false, primary = false): BrowserWindow {
+function createWindow(preload: string, show: boolean, primary: boolean, size: { width: number; height: number }): BrowserWindow {
   const window = new BrowserWindow({
-    width: 1280,
-    height: 820,
+    ...size,
     minWidth: 520,
     minHeight: 600,
     show,
@@ -326,6 +328,13 @@ async function main(): Promise<void> {
   let startup: Promise<void> | undefined
   let workspaceRecovery: Promise<void> | undefined
   let mainWindow: BrowserWindow | undefined
+  const windowState = new DesktopWindowState(join(app.getPath('userData'), 'window-state.json'))
+  const captureWindowState = (): void => {
+    const window = mainWindow
+    if (window === undefined || window.isDestroyed() || !window.isVisible() || window.isMinimized() || window.isFullScreen()) return
+    const { width, height } = window.getNormalBounds()
+    windowState.capture({ width, height, maximized: window.isMaximized() })
+  }
   const interfaceScale = new DesktopInterfaceScale(join(app.getPath('userData'), 'interface-scale.json'), (state) => {
     if (mainWindow === undefined || mainWindow.isDestroyed()) return
     mainWindow.webContents.setZoomFactor(state.factor)
@@ -590,6 +599,8 @@ async function main(): Promise<void> {
         const stopFailure = updateStopFailure as DesktopHostUncleanExitError | undefined
         if (stopFailure !== undefined) throw new DesktopUpdatePreparationError('stop-failed', locale.messages.updateStopFailed, stopFailure.message)
         updateJournal?.action('install-confirmed')
+        captureWindowState()
+        await windowState.save().catch((error: unknown) => { console.error(error) })
         shellInstallerOwnsQuit = true
       } catch (error) {
         if (!updateStoppedHost) await host.updateTasks('unlock').catch((unlockError: unknown) => { console.error(unlockError) })
@@ -1026,17 +1037,27 @@ async function main(): Promise<void> {
     }
   }
   const createMainWindow = (): BrowserWindow => {
-    const window = createWindow(appPreload, false, true)
+    const restoreMaximized = windowState.state.maximized
+    const window = createWindow(appPreload, false, true, windowState.dimensions(screen.getPrimaryDisplay().workAreaSize))
     window.webContents.setZoomMode('isolated')
     window.webContents.setZoomFactor(interfaceScale.state.factor)
     window.webContents.on('did-finish-load', () => { window.webContents.setZoomFactor(interfaceScale.state.factor) })
     mainWindow = window
+    window.once('show', () => {
+      if (restoreMaximized) window.maximize()
+      captureWindowState()
+    })
+    window.on('resize', captureWindowState)
+    window.on('maximize', captureWindowState)
+    window.on('unmaximize', captureWindowState)
     browserGuests.bind(window, (guest, name) => shortcuts.attachGuest(window, guest, name))
     shortcuts.attach(window)
     window.on('focus', automaticCheck)
     // Without a Linux tray, closing must not leave an inaccessible background process.
     window.on('close', (event) => {
       if (quitting || shellInstallerOwnsQuit || sessionEnding) return
+      captureWindowState()
+      void windowState.save().catch((error: unknown) => { console.error(error) })
       event.preventDefault()
       if (updateDialog.isOpen) { updateDialog.focus(); return }
       if (process.platform === 'linux' && tray === undefined) { app.quit(); return }
@@ -1208,6 +1229,7 @@ async function main(): Promise<void> {
   })
   if (process.platform !== 'win32') powerMonitor.on('shutdown', () => { sessionEnding = true })
   const finishQuit = (): void => {
+    captureWindowState()
     quitting = true
     shuttingDown = true
     updateJournal?.action('quit-requested')
@@ -1220,7 +1242,8 @@ async function main(): Promise<void> {
     updateSchedule.dispose()
     updateDialog.dispose()
     mandatoryUI?.dispose()
-    void Promise.all([Promise.resolve(mandatoryPolicy?.dispose()).then(() => policyAuth?.dispose()), backend.close(),
+    void Promise.all([windowState.save().catch((error: unknown) => { console.error(error) }),
+      Promise.resolve(mandatoryPolicy?.dispose()).then(() => policyAuth?.dispose()), backend.close(),
       // A Platform cleanup failure is logged without cutting the remaining Host shutdown short.
       platformView.dispose().catch((error: unknown) => { console.error(error) })])
       .catch((error: unknown) => { console.error(error) }).finally(() => { app.quit() })
@@ -1258,6 +1281,7 @@ async function main(): Promise<void> {
   }
 
   await interfaceScale.load()
+  await windowState.load()
   mainWindow = createMainWindow()
   const manifest: unknown = JSON.parse(await readFile(join(app.getAppPath(), 'package.json'), 'utf8'))
   if (typeof manifest !== 'object' || manifest === null) throw new Error('desktop policy: invalid application manifest')

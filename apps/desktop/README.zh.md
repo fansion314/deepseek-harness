@@ -4,7 +4,7 @@
 
 桌面应用是完整 dsh Web 应用外的一层 Electron 壳。Electron RunAsNode 子进程启动共享 profile runner，Electron 立即从 `dsh-app://app/` 加载打包内的 Web 入口。共享加载页等待 Host 启动注入，然后在同一文档中启动客户端。Electron 将应用 HTTP 请求转发给已认证的 Web Host，转发时丢弃描述 Node fetch 连接而非资源本身的响应头（`transfer-encoding`、`connection`、`keep-alive`），并把插件 bundle 响应标记为 `no-store`，因为其每次启动都变化的 revision 只会在 Chromium 磁盘缓存中累积；WebSocket 流连接到该 Host，仅为归属的应用窗口附加凭据。Node IPC 承载启动注入、就绪与关闭。Desktop 默认使用端口 `19387`，与 Web 的 `3080` 分开；可通过 `webserver.config.port` patch 覆盖。
 
-社区 Linux 软件包可在非打包启动时设置 `DSH_DESKTOP_HOST_NODE`，为 Host 和包操作选择独立的 Node 可执行文件。默认使用 Electron Node 模式。[Arch 打包](../../aur/README.zh.md)使用 Electron Node 和系统 libvips。其启动器设置 `DSH_DESKTOP_PRIMARY_RUNTIME_IN_PLACE=1`，让 Host 使用由 pacman 管理的解释器链接和当前 Python 分发包元数据，不将其复制到 Harness 主目录。
+社区 Linux 软件包可在非打包启动时设置 `DSH_DESKTOP_HOST_NODE`，为 Host 和包操作选择独立的 Node 可执行文件。默认使用 Electron Node 模式。应用位于 ASAR 时，可用 `DSH_DESKTOP_NODE_BIN` 指定包脚本 Node 启动器所在的真实目录。[Arch 打包](../../aur/README.zh.md)使用 Electron Node 和系统 libvips。其启动器设置 `DSH_DESKTOP_PRIMARY_RUNTIME_IN_PLACE=1`，让 Host 使用由 pacman 管理的解释器链接和当前 Python 分发包元数据，不将其复制到 Harness 主目录。
 
 应用菜单第一项“**关于 DeepSeek Harness**”打开 Electron 原生关于面板，展示应用图标、产品名称和当前安装的发布版本。菜单文案跟随桌面壳的语言。macOS 的隐藏、隐藏其他、显示全部和退出条目使用本地化文案，隐藏和退出条目包含 DeepSeek Harness 产品名称。这些条目保留原生动作和快捷键。macOS 从应用包读取图标，因此未打包的开发启动会显示 Electron 图标；Windows 使用随包分发的 PNG。
 
@@ -23,6 +23,8 @@ Desktop Host 的 Platform API 请求与更新策略请求用相同的 Platform �
 按 F12（多媒体功能键键盘上为 Fn+F12）、macOS 的 Command+Option+I 或 Windows 的 Ctrl+Shift+I，可切换当前获得焦点的应用页面的 DevTools，打包版本同样支持。这些原生快捷键通过隐藏的应用菜单项注册。更新遮罩和打包版本的内嵌浏览器禁用 DevTools。
 
 桌面版通用设置提供 **界面缩放**，范围为 75%–200%，初始值为 100%。修改立即应用于整个工作区，并保存在 Electron userData 中；它独立于对话字体大小，不同步到其他设备。保存失败时保留已接受的缩放比例。
+
+主窗口关闭或应用退出时，将普通窗口的宽度、高度和最大化状态保存到 Electron userData 下的 `window-state.json`。启动时恢复该状态，并按当前显示器工作区限制普通窗口尺寸。最小化或进入全屏不会覆盖普通窗口几何信息；欢迎窗口保持其固定尺寸。
 
 ## 关闭窗口与退出
 

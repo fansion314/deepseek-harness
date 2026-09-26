@@ -16,6 +16,9 @@ let exited
 let child
 
 async function launch() {
+  const profile = join(scratch, 'dsh', 'profiles', 'desktop')
+  await mkdir(profile, { recursive: true })
+  await writeFile(join(profile, 'cordis.patch.yml'), '- id: webserver\n  config:\n    host: 127.0.0.1\n    port: 0\n')
   application = await electron.launch({ executablePath: resolve(appRoot, '../../bin/dsh-desktop'),
     args: [`--user-data-dir=${join(scratch, 'chromium')}`, '--lang=en-US'], timeout: 60_000,
     env: { ...env, DSH_HOME: join(scratch, 'dsh'), DSH_AGENTS_HOME: join(scratch, 'agents'), XDG_CACHE_HOME: join(scratch, 'cache') } })
@@ -77,8 +80,9 @@ async function hostPids() {
 
 try {
   const main = await launch()
-  assert.equal(await main.title(), 'DeepSeek Harness Desktop')
-  await main.getByText('DeepSeek Harness Desktop', { exact: true }).waitFor()
+  assert.equal(await application.evaluate(({ app }) => app.getAppPath()), join(appRoot, 'app.asar'))
+  assert.equal(await main.title(), 'DeepSeek Harness')
+  await main.getByText('DeepSeek Harness', { exact: true }).waitFor()
   assert.equal(await application.evaluate(({ Menu }) => Menu.getApplicationMenu()), null)
   await main.getByRole('button', { name: 'Account menu', exact: true }).click()
   await main.getByRole('menuitem', { name: 'Settings', exact: true }).click()
@@ -112,6 +116,14 @@ try {
   const hosts = await hostPids()
   await main.keyboard.press('Escape')
   const window = await application.browserWindow(main)
+  const savedSize = await window.evaluate(async (owner) => {
+    const resized = new Promise(resolveResize => { owner.once('resize', resolveResize) })
+    owner.setSize(1180, 780)
+    await resized
+    const { width, height } = owner.getNormalBounds()
+    return { width, height }
+  })
+  assert.ok(savedSize.width < 1280 && savedSize.height < 820, 'Resize changed the default dimensions')
   await window.evaluate(owner => { owner.close() })
   assert.equal(await window.evaluate(owner => owner.isVisible()), false)
   for (const pid of hosts) assert.equal(existsSync(`/proc/${pid}`), true, 'Host survives hiding the window')
@@ -119,10 +131,16 @@ try {
   assert.equal(await window.evaluate(owner => owner.isVisible()), true)
   await application.evaluate(({ app }) => { app.quit() })
   await waitForExit()
+  assert.deepEqual(JSON.parse(await readFile(join(scratch, 'chromium/window-state.json'), 'utf8')), { ...savedSize, maximized: false })
   for (const pid of hosts) assert.equal(existsSync(`/proc/${pid}`), false, 'Host exited after explicit quit')
   application = undefined
 
   await launch()
+  assert.deepEqual(await application.evaluate(({ BrowserWindow }) => {
+    const { width, height } = BrowserWindow.getAllWindows()
+      .find(window => window.webContents.getURL().startsWith('dsh-app://app/')).getNormalBounds()
+    return { width, height }
+  }), savedSize)
   assert.equal(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
     .find(window => window.webContents.getURL().startsWith('dsh-app://app/')).webContents.getZoomFactor()), 1.5)
   const restartedHosts = await hostPids()
@@ -133,7 +151,10 @@ try {
   await waitForExit()
   for (const pid of restartedHosts) assert.equal(existsSync(`/proc/${pid}`), false, 'Host exited after terminal SIGINT')
   application = undefined
-  console.log('Arch desktop: branding, no menu bar, hide/reopen, Electron Host, scale persistence and clean quit/SIGINT verified')
+  console.log('Arch desktop: ASAR, branding, window-size and scale persistence, hide/reopen, Electron Host and clean quit/SIGINT verified')
+} catch (error) {
+  if (evidence && application) await screenshot('failure.png').catch(captureError => { console.error(captureError) })
+  throw error
 } finally {
   try {
     if (application) {

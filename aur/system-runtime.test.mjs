@@ -14,6 +14,7 @@ test('concurrent launches reuse metadata and link system runtimes without copyin
     await mkdir(join(app, 'runtime/office-skills'), { recursive: true })
     await mkdir(join(app, 'runtime/bin'), { recursive: true })
     await cp('aur/node', join(app, 'runtime/bin/node'))
+    await cp('aur/asar-paths.mjs', join(app, 'runtime/asar-paths.mjs'))
     await chmod(join(app, 'runtime/bin/node'), 0o755)
     await cp('apps/desktop/node_modules/pnpm', join(app, 'runtime/pnpm'), { recursive: true, dereference: true })
     await writeFile(join(app, 'package.json'), JSON.stringify({ version: '0.1.7-rc.2' }))
