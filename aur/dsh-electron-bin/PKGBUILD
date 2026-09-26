@@ -17,7 +17,7 @@ conflicts=('dsh-electron')
 options=('!strip')
 source=("${url}/releases/download/${_tag}/dsh-electron-${_version}-${pkgrel}-x86_64.tar.zst")
 # Refreshed with the verified artifact digest by aur/prepare-release.sh.
-sha256sums=('304eaad7f22b52b3ea3bfd2669ebd2b41cc1daa8149be2fb2213b907b5fd911d')
+sha256sums=('015b1184006d6449ccdcb23720ff82b9af97d0e8ae46c2b3b08721ab6aa6fe37')
 
 package() {
   cp -a usr "$pkgdir/"
