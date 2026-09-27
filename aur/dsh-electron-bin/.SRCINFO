@@ -29,6 +29,6 @@ pkgbase = dsh-electron-bin
 	conflicts = dsh-electron
 	options = !strip
 	source = https://github.com/fansion314/deepseek-harness/releases/download/arch-v0.1.7-rc.2-6/dsh-electron-0.1.7-rc.2-6-x86_64.tar.zst
-	sha256sums = 015b1184006d6449ccdcb23720ff82b9af97d0e8ae46c2b3b08721ab6aa6fe37
+	sha256sums = 703c48aaecdce0a7dff630f56d90de37ddbf43dc8e20d9c576ab55098eb32def
 
 pkgname = dsh-electron-bin

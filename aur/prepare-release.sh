@@ -19,9 +19,4 @@ for name in dsh-electron dsh-electron-bin; do
     sed -i "s/^sha256sums=.*/sha256sums=('$digest')/" "release/aur/$name/PKGBUILD"
   fi
   (cd "release/aur/$name" && makepkg --printsrcinfo > .SRCINFO)
-  tar -czf "release/$name-aur.tar.gz" -C release/aur "$name/PKGBUILD" "$name/.SRCINFO"
 done
-(
-  cd release
-  sha256sum "$artifact" ./*-aur.tar.gz > SHA256SUMS
-)

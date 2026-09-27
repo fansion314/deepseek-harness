@@ -15,7 +15,7 @@
 
 ## 安装 {#installation}
 
-GitHub 发行版包含可安装的 `.pkg.tar.zst` 文件、SHA-256 清单，以及包含 `PKGBUILD` 和 `.SRCINFO` 的 AUR 配方归档。二进制配方在打包前校验应用归档。这些配方已准备供 AUR 提交使用；工作流不会向 aur.archlinux.org 上传。
+GitHub 发行版仅保存一份供 `dsh-electron-bin` PKGBUILD 下载并校验的应用归档。源码与二进制配方及其 `.SRCINFO` 位于此目录。工作流会构建两个软件包用于验证，但不发布 pacman 包，也不会向 aur.archlinux.org 上传配方。
 
 桌面启动命令为 `dsh-desktop`；侧栏、窗口标题和应用菜单名称为 DeepSeek Harness。两个软件包相互冲突。应用通过 pacman 或 AUR 助手更新；上游应用内更新器处于停用状态。系统 Electron 优先读取对应版本的参数文件，再回退到 `~/.config/electron-flags.conf` 读取显示和 Chromium 选项。
 
@@ -23,7 +23,7 @@ GitHub 发行版包含可安装的 `.pkg.tar.zst` 文件、SHA-256 清单，以�
 
 ## 发行构建 {#release-builds}
 
-[工作流](../.github/workflows/arch-release.yml) 在 Arch 容器内以非特权用户构建。它使用固定的 AUR 配方构建官方仓库中缺失的 `python-pptx`；本地安装需要该 AUR 依赖，或由已配置仓库提供的等效软件包。推送 `arch-v<upstream-version>-<pkgrel>` 标签后，运行检查和打包成功才会发布预发行版。手动运行仅生成 Actions 构建产物，不发布发行版。打标签前，两个配方的版本和发行编号必须一致。
+[工作流](../.github/workflows/arch-release.yml) 在 Arch 容器内以非特权用户构建。它使用固定的 AUR 配方构建官方仓库中缺失的 `python-pptx`；本地安装需要该 AUR 依赖，或由已配置仓库提供的等效软件包。推送 `arch-v<upstream-version>-<pkgrel>` 标签后，运行检查和打包成功才会发布应用归档。手动运行仅生成 Actions 构建产物，不发布发行版。打标签前，两个配方的版本和发行编号必须一致。
 
 构建使用仓库固定的 pnpm，编译桌面端和 Web 前端，并部署生产 JavaScript 依赖。运行时解释器和 Python 库由 pacman 提供。发布前执行原生模块、PTY、搜索、Host、前端、Office 转换和 Electron 窗口检查。发行配方写入实际归档校验和并生成 `.SRCINFO`；提交到 AUR 前，仓库内二进制配方必须与发布归档一致。
 

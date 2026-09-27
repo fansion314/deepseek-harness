@@ -15,7 +15,7 @@ English | [中文](README.zh.md)
 
 ## Installation
 
-The GitHub release includes installable `.pkg.tar.zst` files, a SHA-256 manifest, and AUR recipe archives containing `PKGBUILD` and `.SRCINFO`. The binary recipe verifies the application archive before packaging it. The recipes are prepared for AUR submission; the workflow does not upload them to aur.archlinux.org.
+The GitHub release contains one application archive for the `dsh-electron-bin` PKGBUILD to download and verify. The source and binary recipes, including `.SRCINFO`, live in this directory. The workflow builds both packages for verification but does not publish the pacman packages or upload recipes to aur.archlinux.org.
 
 The desktop command is `dsh-desktop`; the sidebar, window title, and application menu entry use DeepSeek Harness. The packages conflict with each other. Application updates use pacman or an AUR helper; the upstream in-app updater is inactive. System Electron reads its version-specific flags file first and falls back to `~/.config/electron-flags.conf` for display and Chromium options.
 
@@ -23,7 +23,7 @@ The package also installs `dsh`, using the same-version upstream CLI and bundled
 
 ## Release builds
 
-The [workflow](../.github/workflows/arch-release.yml) builds in an Arch container as an unprivileged user. It builds a pinned AUR recipe for `python-pptx`, which is absent from the official repositories; local installations need that AUR dependency or an equivalent package from a configured repository. An `arch-v<upstream-version>-<pkgrel>` tag publishes a prerelease after runtime checks and packaging succeed. Manual runs create Actions artifacts without publishing. Both recipes must have matching versions and release numbers before tagging.
+The [workflow](../.github/workflows/arch-release.yml) builds in an Arch container as an unprivileged user. It builds a pinned AUR recipe for `python-pptx`, which is absent from the official repositories; local installations need that AUR dependency or an equivalent package from a configured repository. An `arch-v<upstream-version>-<pkgrel>` tag publishes the application archive after runtime checks and packaging succeed. Manual runs create an Actions artifact without publishing. Both recipes must have matching versions and release numbers before tagging.
 
 The build uses the repository's pinned pnpm, compiles the desktop and Web frontend, and deploys production JavaScript dependencies. Runtime interpreters and Python libraries come from pacman. Native-module, PTY, search, Host, frontend, Office-conversion, and Electron-window checks run before publication. Release recipes receive the actual archive checksum and generated `.SRCINFO`; the checked-in binary recipe must match the published archive before AUR submission.
 

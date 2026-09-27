@@ -76,23 +76,17 @@ jobs:
           bash aur/prepare-release.sh
           cp release/dsh-electron-*.tar.zst release/aur/dsh-electron-bin/
           (cd release/aur/dsh-electron-bin && makepkg --cleanbuild --noconfirm)
-          cp release/aur/dsh-electron-bin/*.pkg.tar.zst release/
           # Source builds execute the same build() above; package() consumes its verified payload.
           mkdir -p release/aur/dsh-electron/src/deepseek-harness/release
           cp release/dsh-electron-*.tar.zst release/aur/dsh-electron/src/deepseek-harness/release/
           (cd release/aur/dsh-electron && makepkg --repackage --nodeps --noconfirm)
-          cp release/aur/dsh-electron/*.pkg.tar.zst release/
-          (cd release && sha256sum ./*.pkg.tar.zst >> SHA256SUMS)
           PACKAGE
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: arch-release
           if-no-files-found: error
-          path: |
-            release/*.tar.zst
-            release/*-aur.tar.gz
-            release/SHA256SUMS
+          path: release/dsh-electron-*-x86_64.tar.zst
 
   publish:
     needs: build
@@ -107,15 +101,16 @@ jobs:
           name: arch-release
           path: release
 
-      - name: Publish verified Arch packages
+      - name: Publish AUR source archive
         working-directory: release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           ARCH_TAG: ${{ github.ref_name }}
         run: |
-          sha256sum --check SHA256SUMS
+          archive="dsh-electron-${ARCH_TAG#arch-v}-x86_64.tar.zst"
+          test -f "$archive"
           gh release create "$ARCH_TAG" --verify-tag --prerelease \
             --title "DeepSeek Harness $ARCH_TAG for Arch Linux" \
-            --notes 'Community Arch Linux/CachyOS build using system Electron. Updates are managed by pacman. Includes source and binary AUR recipes; no Electron binary is bundled.' \
-            ./*.tar.zst ./*-aur.tar.gz SHA256SUMS
+            --notes 'Application archive for the dsh-electron-bin AUR package. The PKGBUILD installs it with Arch system Electron. The Arch build and package checks passed in GitHub Actions.' \
+            "$archive"
