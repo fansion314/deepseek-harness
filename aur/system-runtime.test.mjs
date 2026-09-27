@@ -34,7 +34,7 @@ test('concurrent launches reuse metadata and link system runtimes without copyin
     assert.equal(await realpath(node), join(app, 'runtime/bin/node'))
     const probe = await promisify(execFile)(node, ['-p', 'JSON.stringify(process.versions)'], { env: {}, timeout: 30_000 })
     const versions = JSON.parse(probe.stdout)
-    assert.match(versions.electron, /^44\./)
+    assert.match(versions.electron, /^\d+\./)
     assert.equal(manifest.node, versions.node)
     assert.equal(await realpath(join(runtime, 'dependencies/pnpm')), join(app, 'runtime/pnpm'))
     assert.deepEqual(await readdir(join(runtime, 'dependencies/node/bin')), ['node'])

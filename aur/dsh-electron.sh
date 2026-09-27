@@ -12,4 +12,4 @@ export DSH_DESKTOP_HOST_NODE="$app/runtime/bin/node"
 export DSH_DESKTOP_OPEN_DEVTOOLS=0
 export ELECTRON_FORCE_IS_PACKAGED=false
 unset ELECTRON_RUN_AS_NODE
-exec /usr/bin/electron44 --class=dsh-electron "$app/app.asar" "$@"
+exec /usr/bin/electron --class=dsh-electron "$app/app.asar" "$@"

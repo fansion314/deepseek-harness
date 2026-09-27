@@ -1,7 +1,7 @@
 /** Exercise real desktop zoom, persistence, window close and terminal termination with isolated user state. */
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, readlink, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readlink, realpath, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -68,7 +68,7 @@ async function hostPids() {
     try {
       const args = await readFile(`/proc/${pid}/cmdline`, 'utf8')
       if (args.includes('/dsh-desktop-host/')) {
-        assert.equal(await readlink(`/proc/${pid}/exe`), '/usr/lib/electron44/electron')
+        assert.equal(await readlink(`/proc/${pid}/exe`), await realpath('/usr/lib/electron/electron'))
         hosts.push(Number(pid))
       }
     }

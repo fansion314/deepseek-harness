@@ -3,4 +3,4 @@
 export ELECTRON_RUN_AS_NODE=1
 launcher=$(/usr/bin/realpath -- "$0")
 bin=${launcher%/*}
-exec /usr/lib/electron44/electron --expose-internals --import "$bin/../asar-paths.mjs" "$@"
+exec /usr/lib/electron/electron --expose-internals --import "$bin/../asar-paths.mjs" "$@"

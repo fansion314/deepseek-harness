@@ -4,7 +4,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-electron` builds DeepSeek Harness from source; `dsh-electron-bin` installs the prebuilt application. Both target x86_64 and use Arch's `electron44`, without bundling Electron. These are community packages from [fansion314/deepseek-harness](https://github.com/fansion314/deepseek-harness), independent of upstream Desktop releases.
+`dsh-electron` builds DeepSeek Harness from source; `dsh-electron-bin` installs the prebuilt application. Both target x86_64 and depend on Arch's `electron` package, without bundling Electron. These are community packages from [fansion314/deepseek-harness](https://github.com/fansion314/deepseek-harness), independent of upstream Desktop releases.
 
 ## Contents
 
@@ -17,7 +17,7 @@ English | [中文](README.zh.md)
 
 The GitHub release includes installable `.pkg.tar.zst` files, a SHA-256 manifest, and AUR recipe archives containing `PKGBUILD` and `.SRCINFO`. The binary recipe verifies the application archive before packaging it. The recipes are prepared for AUR submission; the workflow does not upload them to aur.archlinux.org.
 
-The desktop command is `dsh-desktop`; the sidebar, window title, and application menu entry use DeepSeek Harness. The packages conflict with each other. Application updates use pacman or an AUR helper; the upstream in-app updater is inactive. System Electron reads `~/.config/electron44-flags.conf` (or `electron-flags.conf`) for display and Chromium options.
+The desktop command is `dsh-desktop`; the sidebar, window title, and application menu entry use DeepSeek Harness. The packages conflict with each other. Application updates use pacman or an AUR helper; the upstream in-app updater is inactive. System Electron reads its version-specific flags file first and falls back to `~/.config/electron-flags.conf` for display and Chromium options.
 
 The package also installs `dsh`, using the same-version upstream CLI and bundled pnpm under Electron Node. `dsh web --host 127.0.0.1 --port 0 --no-open` serves the Web UI without opening a browser. The CLI retains the `headless`, `sdk`, `sdk-minimal`, and `acp` profiles, configuration export, and `dsh plugin --profile <name> ...` package management. Model requests still require provider credentials. CLI profiles and the reserved Desktop profile use their own configuration and plugin installations; window and tray integration belong to `dsh-desktop`.
 
@@ -31,8 +31,8 @@ The build uses the repository's pinned pnpm, compiles the desktop and Web fronte
 
 | Capability | Arch packages used at runtime |
 |---|---|
-| Desktop shell | `electron44` |
-| Host and JavaScript execution | Node supplied by `electron44` |
+| Desktop shell | `electron` |
+| Host and JavaScript execution | Node supplied by `electron` |
 | Plugin package operations | Bundled pnpm, run by Electron Node |
 | Python interpreter | `python` |
 | Data analysis | `python-numpy`, `python-pandas` |
@@ -49,7 +49,7 @@ The DSH-specific `libreoffice-kit-wasm` engine remains bundled: document preview
 
 ## Runtime
 
-Resources live under `/usr/lib/dsh-electron`. The launcher uses Desktop's configurable resource paths and disables development tools. User profiles remain in the normal DSH home. Electron 44 is versioned separately so an upgrade of Arch's latest-electron metapackage cannot silently switch the application to a new major release.
+Resources live under `/usr/lib/dsh-electron`. The launcher uses Desktop's configurable resource paths and disables development tools. User profiles remain in the normal DSH home. Arch's `electron` package tracks its latest stable Electron release; after a major upgrade, verify the desktop and native modules before relying on the existing binary package.
 
 The launcher uses Electron Node for Host, package operations, and the primary JavaScript runtime. It reads current system Python distribution versions and creates only metadata and links under `${XDG_CACHE_HOME:-~/.cache}/dsh-electron/runtimes`. The Host uses these dependencies in place; it does not copy `/usr` or interpreters into `~/.dsh`. Metadata is refreshed after system versions change. Missing dependencies stop startup with an error. System Python follows Arch's externally managed environment policy; install additional system libraries with pacman or use a workspace virtual environment.
 

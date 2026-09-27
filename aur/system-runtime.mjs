@@ -18,7 +18,7 @@ export function prepareSystemRuntime(appRoot, cacheRoot) {
   const python = JSON.parse(execFileSync('/usr/bin/python', ['-I', '-B', '-c',
     'import importlib.metadata as m, json, platform, sys; import numpy, pandas, docx, pptx, openpyxl, PIL, lxml, xlsxwriter; print(json.dumps({"version": platform.python_version(), "packages": {n: m.version(n) for n in json.loads(sys.argv[1])}}))',
     JSON.stringify(distributions)], { encoding: 'utf8' }))
-  const node = execFileSync('/usr/lib/electron44/electron', ['-p', 'process.versions.node'], {
+  const node = execFileSync('/usr/lib/electron/electron', ['-p', 'process.versions.node'], {
     encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
   }).trim()
   const pnpmRoot = join(appRoot, 'runtime/pnpm')

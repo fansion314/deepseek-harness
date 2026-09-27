@@ -4,7 +4,7 @@
 
 ## 概要
 
-`dsh-electron` 从源码构建 DeepSeek Harness；`dsh-electron-bin` 安装预构建应用。两者均面向 x86_64，使用 Arch 的 `electron44`，不捆绑 Electron。这些是 [fansion314/deepseek-harness](https://github.com/fansion314/deepseek-harness) 提供的社区软件包，独立于上游桌面版发行。
+`dsh-electron` 从源码构建 DeepSeek Harness；`dsh-electron-bin` 安装预构建应用。两者均面向 x86_64，依赖 Arch 的 `electron` 软件包，不捆绑 Electron。这些是 [fansion314/deepseek-harness](https://github.com/fansion314/deepseek-harness) 提供的社区软件包，独立于上游桌面版发行。
 
 ## 目录
 
@@ -17,7 +17,7 @@
 
 GitHub 发行版包含可安装的 `.pkg.tar.zst` 文件、SHA-256 清单，以及包含 `PKGBUILD` 和 `.SRCINFO` 的 AUR 配方归档。二进制配方在打包前校验应用归档。这些配方已准备供 AUR 提交使用；工作流不会向 aur.archlinux.org 上传。
 
-桌面启动命令为 `dsh-desktop`；侧栏、窗口标题和应用菜单名称为 DeepSeek Harness。两个软件包相互冲突。应用通过 pacman 或 AUR 助手更新；上游应用内更新器处于停用状态。系统 Electron 从 `~/.config/electron44-flags.conf`（或 `electron-flags.conf`）读取显示和 Chromium 选项。
+桌面启动命令为 `dsh-desktop`；侧栏、窗口标题和应用菜单名称为 DeepSeek Harness。两个软件包相互冲突。应用通过 pacman 或 AUR 助手更新；上游应用内更新器处于停用状态。系统 Electron 优先读取对应版本的参数文件，再回退到 `~/.config/electron-flags.conf` 读取显示和 Chromium 选项。
 
 软件包同时安装 `dsh`，使用同版本上游 CLI，并通过 Electron Node 运行内置 pnpm。`dsh web --host 127.0.0.1 --port 0 --no-open` 启动 Web 界面但不自动打开浏览器。CLI 保留 `headless`、`sdk`、`sdk-minimal` 和 `acp` profile、配置导出，以及 `dsh plugin --profile <name> ...` 包管理功能。模型请求仍需要模型提供方凭据。CLI profile 与保留的 Desktop profile 各自使用配置和插件安装目录；窗口与托盘集成由 `dsh-desktop` 提供。
 
@@ -31,8 +31,8 @@ GitHub 发行版包含可安装的 `.pkg.tar.zst` 文件、SHA-256 清单，以�
 
 | 能力 | 运行时使用的 Arch 软件包 |
 |---|---|
-| 桌面界面 | `electron44` |
-| Host 和 JavaScript 执行 | `electron44` 提供的 Node |
+| 桌面界面 | `electron` |
+| Host 和 JavaScript 执行 | `electron` 提供的 Node |
 | 插件包操作 | 随包提供的 pnpm，由 Electron Node 运行 |
 | Python 解释器 | `python` |
 | 数据分析 | `python-numpy`, `python-pandas` |
@@ -49,7 +49,7 @@ DSH 专用的 `libreoffice-kit-wasm` 引擎仍随包提供：文档预览和转�
 
 ## 运行环境 {#runtime}
 
-资源位于 `/usr/lib/dsh-electron`。启动器使用 Desktop 可配置的资源路径，并关闭开发者工具。用户配置仍保存在常规 DSH 主目录。Electron 44 采用独立版本的软件包，因此 Arch 最新 Electron 元软件包升级时，不会将应用静默切换至新的主版本。
+资源位于 `/usr/lib/dsh-electron`。启动器使用 Desktop 可配置的资源路径，并关闭开发者工具。用户配置仍保存在常规 DSH 主目录。Arch 的 `electron` 软件包跟随最新稳定版；主版本升级后，应先验证桌面端和原生模块，再继续依赖现有二进制包。
 
 启动器使用 Electron Node 运行 Host、包操作和主 JavaScript 运行时。它读取当前系统 Python 分发包版本，仅在 `${XDG_CACHE_HOME:-~/.cache}/dsh-electron/runtimes` 下创建元数据和链接。Host 就地使用这些依赖，不将 `/usr` 或解释器复制到 `~/.dsh`。系统版本变化后更新元数据。缺少依赖时启动会报错。系统 Python 遵循 Arch 的外部管理环境策略；额外的系统库通过 pacman 安装，也可使用工作区虚拟环境。
 

@@ -117,5 +117,5 @@ jobs:
           sha256sum --check SHA256SUMS
           gh release create "$ARCH_TAG" --verify-tag --prerelease \
             --title "DeepSeek Harness $ARCH_TAG for Arch Linux" \
-            --notes 'Community Arch Linux/CachyOS build using system Electron 44. Updates are managed by pacman. Includes source and binary AUR recipes; no Electron binary is bundled.' \
+            --notes 'Community Arch Linux/CachyOS build using system Electron. Updates are managed by pacman. Includes source and binary AUR recipes; no Electron binary is bundled.' \
             ./*.tar.zst ./*-aur.tar.gz SHA256SUMS

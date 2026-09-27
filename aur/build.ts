@@ -22,11 +22,10 @@ const app = join(payload, 'usr/lib/dsh-electron')
 const runtime = join(app, 'runtime')
 const dsh = join(app, 'dsh')
 const run = (command: string, args: string[], env = process.env): Buffer => execFileSync(command, args, { stdio: 'inherit', env })
-const electron = '/usr/lib/electron44/electron'
+const electron = '/usr/lib/electron/electron'
 const versions = JSON.parse(execFileSync(electron, ['-p', 'JSON.stringify(process.versions)'], {
   encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
 })) as { electron: string; node: string }
-if (!versions.electron.startsWith('44.')) throw new Error('This package requires Electron 44')
 rmSync(payload, { recursive: true, force: true })
 mkdirSync(app, { recursive: true })
 
