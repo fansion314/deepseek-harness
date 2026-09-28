@@ -30,6 +30,6 @@ pkgbase = dsh-electron-bin
 	noextract = dsh-electron-0.1.7rc.2-7-x86_64.pkg.tar.zst
 	options = !strip
 	source = https://github.com/fansion314/deepseek-harness/releases/download/arch-v0.1.7-rc.2-7/dsh-electron-0.1.7rc.2-7-x86_64.pkg.tar.zst
-sha256sums = SKIP
+	sha256sums = SKIP
 
 pkgname = dsh-electron-bin
