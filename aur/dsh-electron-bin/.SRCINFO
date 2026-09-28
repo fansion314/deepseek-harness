@@ -1,7 +1,7 @@
 pkgbase = dsh-electron-bin
 	pkgdesc = DeepSeek Harness desktop using system Electron (prebuilt)
 	pkgver = 0.1.7rc.2
-	pkgrel = 6
+	pkgrel = 7
 	url = https://github.com/fansion314/deepseek-harness
 	arch = x86_64
 	license = MIT
@@ -27,8 +27,9 @@ pkgbase = dsh-electron-bin
 	depends = xdg-utils
 	provides = dsh-electron=0.1.7rc.2
 	conflicts = dsh-electron
+	noextract = dsh-electron-0.1.7rc.2-7-x86_64.pkg.tar.zst
 	options = !strip
-	source = https://github.com/fansion314/deepseek-harness/releases/download/arch-v0.1.7-rc.2-6/dsh-electron-0.1.7-rc.2-6-x86_64.tar.zst
-	sha256sums = 703c48aaecdce0a7dff630f56d90de37ddbf43dc8e20d9c576ab55098eb32def
+	source = https://github.com/fansion314/deepseek-harness/releases/download/arch-v0.1.7-rc.2-7/dsh-electron-0.1.7rc.2-7-x86_64.pkg.tar.zst
+sha256sums = SKIP
 
 pkgname = dsh-electron-bin

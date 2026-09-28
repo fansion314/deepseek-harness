@@ -6,7 +6,7 @@ source aur/dsh-electron/PKGBUILD
 [[ ${ARCH_TAG:?ARCH_TAG is required} == "$_tag" ]]
 binary_version=$(source aur/dsh-electron-bin/PKGBUILD; printf '%s %s %s' "$_version" "$pkgver" "$pkgrel")
 [[ $binary_version == "$_version $pkgver $pkgrel" ]]
-artifact="dsh-electron-${_version}-${pkgrel}-x86_64.tar.zst"
+artifact="dsh-electron-${pkgver}-${pkgrel}-x86_64.pkg.tar.zst"
 digest=$(sha256sum "release/$artifact")
 digest=${digest%% *}
 mkdir -p release/aur

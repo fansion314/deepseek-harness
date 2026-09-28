@@ -63,7 +63,7 @@ jobs:
           desktop-file-validate aur/dsh-electron.desktop
           BUILD
 
-      - name: Generate AUR metadata and build both Arch packages
+      - name: Build pacman package and validate the binary recipe
         shell: bash
         env:
           REF_NAME: ${{ github.ref_name }}
@@ -73,20 +73,22 @@ jobs:
           source aur/dsh-electron/PKGBUILD
           if [[ "$REF_TYPE" == tag ]]; then [[ "$REF_NAME" == "$_tag" ]]; fi
           export ARCH_TAG="$_tag"
-          bash aur/prepare-release.sh
-          cp release/dsh-electron-*.tar.zst release/aur/dsh-electron-bin/
-          (cd release/aur/dsh-electron-bin && makepkg --cleanbuild --noconfirm)
-          # Source builds execute the same build() above; package() consumes its verified payload.
+          # The source recipe packages the validated application tree.
           mkdir -p release/aur/dsh-electron/src/deepseek-harness/release
           cp release/dsh-electron-*.tar.zst release/aur/dsh-electron/src/deepseek-harness/release/
+          cp aur/dsh-electron/PKGBUILD release/aur/dsh-electron/
           (cd release/aur/dsh-electron && makepkg --repackage --nodeps --noconfirm)
+          cp release/aur/dsh-electron/*.pkg.tar.zst release/
+          bash aur/prepare-release.sh
+          cp release/dsh-electron-*.pkg.tar.zst release/aur/dsh-electron-bin/
+          (cd release/aur/dsh-electron-bin && makepkg --cleanbuild --noconfirm)
           PACKAGE
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: arch-release
           if-no-files-found: error
-          path: release/dsh-electron-*-x86_64.tar.zst
+          path: release/dsh-electron-*-x86_64.pkg.tar.zst
 
   publish:
     needs: build
@@ -101,16 +103,16 @@ jobs:
           name: arch-release
           path: release
 
-      - name: Publish AUR source archive
+      - name: Publish pacman package
         working-directory: release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           ARCH_TAG: ${{ github.ref_name }}
         run: |
-          archive="dsh-electron-${ARCH_TAG#arch-v}-x86_64.tar.zst"
+          archive=$(find . -maxdepth 1 -name 'dsh-electron-*-x86_64.pkg.tar.zst' -print -quit)
           test -f "$archive"
           gh release create "$ARCH_TAG" --verify-tag --prerelease \
             --title "DeepSeek Harness $ARCH_TAG for Arch Linux" \
-            --notes 'Application archive for the dsh-electron-bin AUR package. The PKGBUILD installs it with Arch system Electron. The Arch build and package checks passed in GitHub Actions.' \
+            --notes 'Install this Arch package directly with pacman -U. The dsh-electron-bin AUR recipe downloads and repackages it with makepkg. Both use system Electron.' \
             "$archive"
