@@ -1,8 +1,8 @@
 # Maintainer: fansion314 <https://github.com/fansion314>
 pkgname=dsh-electron
-pkgver=0.1.7rc.2
-pkgrel=7
-_version=0.1.7-rc.2
+pkgver=0.2.0rc.1
+pkgrel=1
+_version=0.2.0-rc.1
 _tag=arch-v${_version}-${pkgrel}
 pkgdesc='DeepSeek Harness desktop using system Electron'
 arch=('x86_64')
