@@ -1,6 +1,6 @@
 /** Assemble the Linux desktop and its production dependencies for system Electron. */
 import { execFileSync } from 'node:child_process'
-import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { prepareOfficeSkillAssets } from '../scripts/primary-runtime/prepare.ts'
 import { prepareSystemRuntime } from './system-runtime.mjs'
@@ -105,6 +105,9 @@ chmodSync(join(runtime, 'bin/node'), 0o755)
 copy('aur/pnpm', join(runtime, 'bin/pnpm'))
 chmodSync(join(runtime, 'bin/pnpm'), 0o755)
 copy('apps/desktop/node_modules/pnpm', join(runtime, 'pnpm'))
+// Desktop CLI and the Arch launcher share the same physical pnpm installation.
+mkdirSync(join(runtime, 'primary-runtime/dependencies'), { recursive: true })
+symlinkSync('../../pnpm', join(runtime, 'primary-runtime/dependencies/pnpm'))
 buildSystemSharp(join(dsh, 'node_modules'))
 run('patch', ['--batch', '--forward', '-p1', '-d', join(dsh, 'node_modules/node-addon-require-builtin'),
   '-i', join(root, 'aur/require-builtin.patch')])
