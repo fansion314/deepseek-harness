@@ -55,6 +55,7 @@ jobs:
           source aur/dsh-electron/PKGBUILD
           export DSH_ARCH_PKGREL="$pkgrel"
           pnpm install --frozen-lockfile
+          node --check apps/desktop/tests/fixtures/runtime-payload-smoke.mjs
           node --test aur/system-runtime.test.mjs
           DSH_CLIENT_TITLE='DeepSeek Harness' pnpm run build
           pnpm exec tsx aur/build.ts

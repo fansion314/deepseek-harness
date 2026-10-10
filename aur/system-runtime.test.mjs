@@ -1,7 +1,7 @@
 /** Check the Arch adapter against actual pacman-owned interpreters and concurrent launches. */
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { cp, chmod, mkdtemp, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
+import { access, cp, chmod, mkdtemp, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
@@ -36,6 +36,9 @@ test('concurrent launches reuse metadata and link system runtimes without copyin
     const versions = JSON.parse(probe.stdout)
     assert.match(versions.electron, /^\d+\./)
     assert.equal(manifest.node, versions.node)
+    const resourceVersions = JSON.parse(await readFile(join(paths[0], 'versions.json'), 'utf8'))
+    assert.deepEqual(resourceVersions, { node: versions.node, pnpm: manifest.pnpm, python: manifest.python })
+    await assert.rejects(access(join(paths[0], 'pnpm')), { code: 'ENOENT' })
     assert.equal(await realpath(join(runtime, 'dependencies/pnpm')), join(app, 'runtime/pnpm'))
     assert.deepEqual(await readdir(join(runtime, 'dependencies/node/bin')), ['node'])
     assert.deepEqual(await readdir(join(scratch, 'cache')), [paths[0].split('/').at(-1)])

@@ -26,7 +26,7 @@ export function prepareSystemRuntime(appRoot, cacheRoot) {
   const version = JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8')).version
   const manifest = { desktopVersion: version, platform: 'linux', arch: 'x64', python: python.version,
     node, pnpm, pythonPackages: python.packages }
-  const digest = createHash('sha256').update(JSON.stringify({ format: 2, appRoot: resolve(appRoot), manifest })).digest('hex')
+  const digest = createHash('sha256').update(JSON.stringify({ format: 3, appRoot: resolve(appRoot), manifest })).digest('hex')
   const destination = join(resolve(cacheRoot), digest)
   if (existsSync(join(destination, 'primary-runtime/runtime.json'))) return destination
   mkdirSync(cacheRoot, { recursive: true, mode: 0o700 })
@@ -39,7 +39,7 @@ export function prepareSystemRuntime(appRoot, cacheRoot) {
     symlinkSync(join(appRoot, 'runtime/bin/node'), join(dependencies, 'node/bin/node'))
     symlinkSync('/usr', join(dependencies, 'python'))
     symlinkSync(pnpmRoot, join(dependencies, 'pnpm'))
-    symlinkSync(pnpmRoot, join(staging, 'pnpm'))
+    writeFileSync(join(staging, 'versions.json'), `${JSON.stringify({ node, pnpm, python: python.version }, null, 2)}\n`)
     symlinkSync(join(appRoot, 'runtime/bin'), join(staging, 'bin'))
     symlinkSync(join(appRoot, 'runtime/office-skills'), join(staging, 'office-skills'))
     writeFileSync(join(primary, 'runtime.json'), `${JSON.stringify({ ...manifest, payloadDigest: digest }, null, 2)}\n`)
