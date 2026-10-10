@@ -1,0 +1,119 @@
+name: Arch Linux release
+
+on:
+  push:
+    tags: ['arch-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arch-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'fansion314/deepseek-harness'
+    runs-on: ubuntu-latest
+    container: archlinux:base
+    timeout-minutes: 90
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - name: Initialize Arch runner
+        run: |
+          pacman -Syu --noconfirm --needed base-devel git
+          useradd --create-home builder
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install recipe dependencies and test tools
+        shell: bash
+        run: |
+          source aur/dsh-electron/PKGBUILD
+          repository_packages=()
+          for package in "${depends[@]}" "${makedepends[@]}"; do
+            if [[ "$package" != python-pptx ]]; then repository_packages+=("$package"); fi
+          done
+          pacman -S --noconfirm --needed "${repository_packages[@]}" desktop-file-utils xorg-server-xvfb xorg-xauth dbus \
+            python-build python-installer python-setuptools python-wheel python-pyparsing python-pytest
+          git clone https://aur.archlinux.org/python-pptx.git /tmp/python-pptx
+          git -C /tmp/python-pptx checkout 74f6b47a97b0f8c476b64db9ad7fdc0f443a69c8
+          chown -R builder:builder /tmp/python-pptx
+          runuser -u builder -- bash -c 'cd /tmp/python-pptx && makepkg --noconfirm'
+          pacman -U --noconfirm /tmp/python-pptx/python-pptx-*.pkg.tar.zst
+
+      - name: Build and test the desktop runtime
+        shell: bash
+        run: |
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          runuser -u builder -- bash -euo pipefail <<'BUILD'
+          source aur/dsh-electron/PKGBUILD
+          export DSH_ARCH_PKGREL="$pkgrel"
+          pnpm install --frozen-lockfile
+          node --check apps/desktop/tests/fixtures/runtime-payload-smoke.mjs
+          node --test aur/system-runtime.test.mjs
+          DSH_CLIENT_TITLE='DeepSeek Harness' pnpm run build
+          pnpm exec tsx aur/build.ts
+          node aur/smoke-cli.mjs
+          dbus-run-session -- xvfb-run -d -s '-screen 0 1920x1080x24' node aur/smoke-shell.mjs
+          desktop-file-validate aur/dsh-electron.desktop
+          BUILD
+
+      - name: Build pacman package and validate the binary recipe
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          runuser -u builder --preserve-environment -- bash -euo pipefail <<'PACKAGE'
+          source aur/dsh-electron/PKGBUILD
+          if [[ "$REF_TYPE" == tag ]]; then [[ "$REF_NAME" == "$_tag" ]]; fi
+          export ARCH_TAG="$_tag"
+          # The source recipe packages the validated application tree.
+          mkdir -p release/aur/dsh-electron/src/deepseek-harness/release
+          cp release/dsh-electron-*.tar.zst release/aur/dsh-electron/src/deepseek-harness/release/
+          cp aur/dsh-electron/PKGBUILD release/aur/dsh-electron/
+          (cd release/aur/dsh-electron && makepkg --repackage --nodeps --noconfirm)
+          cp release/aur/dsh-electron/*.pkg.tar.zst release/
+          bash aur/prepare-release.sh
+          cp release/dsh-electron-*.pkg.tar.zst release/aur/dsh-electron-bin/
+          (cd release/aur/dsh-electron-bin && makepkg --cleanbuild --noconfirm)
+          PACKAGE
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: arch-release
+          if-no-files-found: error
+          path: release/dsh-electron-*-x86_64.pkg.tar.zst
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/arch-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: arch-release
+          path: release
+
+      - name: Publish pacman package
+        working-directory: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ARCH_TAG: ${{ github.ref_name }}
+        run: |
+          archive=$(find . -maxdepth 1 -name 'dsh-electron-*-x86_64.pkg.tar.zst' -print -quit)
+          test -f "$archive"
+          gh release create "$ARCH_TAG" --verify-tag --prerelease \
+            --title "DeepSeek Harness $ARCH_TAG for Arch Linux" \
+            --notes 'Install this Arch package directly with pacman -U. The dsh-electron-bin AUR recipe downloads and repackages it with makepkg. Both use system Electron.' \
+            "$archive"

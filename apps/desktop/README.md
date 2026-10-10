@@ -8,6 +8,8 @@ The desktop application is an Electron shell around the complete dsh Web applica
 
 Desktop binds `127.0.0.1`, the address Electron dials for the ready URL and the WebSocket credential filter. WebSocket streams use `ws:` or `wss:` according to the Host listener; credentials require matching authority and scheme.
 
+Community Linux packages may set `DSH_DESKTOP_HOST_NODE` for an unpackaged launch to use a separate Node executable for Host and package operations. The default is Electron Node mode. `DSH_DESKTOP_NODE_BIN` can select a real directory containing the package-script Node launcher when the application lives in ASAR. [Arch packaging](../../aur/README.md) uses Electron Node with system libvips. Its launcher sets `DSH_DESKTOP_PRIMARY_RUNTIME_IN_PLACE=1` so the Host uses pacman-owned interpreter links and current Python distribution metadata without copying them into the Harness home.
+
 The first application-menu command, **About DeepSeek Harness**, opens Electron's native About panel with the application icon, product name, and installed release version. The menu follows the Desktop shell locale. On macOS, Hide, Hide Others, Show All, and Quit use localized labels; Hide and Quit include the DeepSeek Harness product name. These commands retain their native actions and shortcuts. macOS reads the icon from its application bundle, so an unpackaged development launch displays Electron's icon; Windows receives the packaged PNG.
 
 Desktop’s local native directory flow opens an Electron folder dialog attached to the application window, restoring, showing, and focusing that window first. Concurrent requests share one dialog; cancellation returns no path and failures remain retryable. Ordinary Web uses the Host chooser. Browse mode lists Host directories. On Linux without zenity or kdialog, automatic selection uses browse instead of the Electron dialog.
@@ -24,6 +26,10 @@ Desktop microphone access is restricted to audio requests from the primary `dsh-
 
 Press F12 (Fn+F12 on media-key keyboards), Command+Option+I on macOS, or Ctrl+Shift+I on Windows to toggle DevTools for the focused application page, including in packaged builds. These native shortcuts use hidden application-menu items. Update overlays and packaged embedded browser guests disable DevTools.
 
+Desktop General Settings offers **Interface scale** from 75% to 200%, initially 100%. Changes apply to the entire workspace immediately and persist in Electron userData; they are independent of conversation font size and are not synchronized to other devices. Failed saves retain the accepted scale.
+
+The main window saves its normal width, height, and maximization state to `window-state.json` under Electron userData when it closes or the application quits. Startup restores that state, limiting normal dimensions to the current display work area. Minimizing or entering fullscreen does not replace the saved normal geometry; the welcome window keeps its own fixed size.
+
 ## Terminal command
 
 The application menu's **Manage dsh Command…** entry, immediately below **Check for Updates…**, shows the current command and offers Install, Repair, and Remove. The command uses Desktop's installed runtime and the ordinary [dsh CLI](../cli/README.md), including when the Desktop application is closed. Open a new terminal after installation and run `dsh --version`.
@@ -33,6 +39,8 @@ On macOS, installation creates `/usr/local/bin/dsh` and requests administrator a
 Command registration is optional after installing Desktop. Use **Manage dsh Command… → Remove** before uninstalling Desktop to remove its CLI registration; the application uninstaller does not remove it. Finish CLI commands before updating or uninstalling Desktop. The CLI runtime version follows the installed Desktop release. See [bundled command runtime](#bundled-command-runtime) for Desktop plugin commands and runtime limitations.
 
 ## Closing the window and quitting
+
+On Linux, closing the workspace or welcome window hides it to the tray and keeps the Host running. If tray creation fails, closing requests application exit with the quit confirmation below. Terminal SIGINT and SIGTERM bypass that confirmation, stop the Host through IPC, and exit without crash-recovery dialogs; the Linux Host runs in a separate process group so terminal signals reach the shell first.
 
 Closing the main window (macOS close button and ⌘W; Windows ×, Alt+F4, and the taskbar Close window command) hides it; Windows asks for acknowledgement before the first hide. The page and the Host keep running, tasks continue, and the next show presents the same document with its session, drafts, and scroll position; a fullscreen macOS window leaves fullscreen before hiding. The window returns through the Dock icon, a second launch, or `dsh://open` on macOS, and through the tray on Windows. Minimize is unchanged. Closing the welcome window before the workspace opens quits on Windows and, on macOS, keeps the application in the Dock without a window.
 
@@ -118,7 +126,7 @@ Windows and macOS relay native fullscreen transitions and the state after each p
 
 Windows uses a 40-DIP caption with native window controls and colors synchronized from the application palette. Localized Application and Edit entries beside the sidebar toggle open native popup menus. They mount only after the application frame publishes its shell overlay seat, and remain absent during startup loading. Application provides Check for Updates and Exit; Edit provides undo, redo, cut, copy, paste, delete, and select all by sending the corresponding keys to the focused editor, independently of custom shortcut bindings. Plugin management uses the main application's Plugins page. No separate native menu row appears on Alt. Other platforms retain their native menus. Editable fields retain keyboard commands and a context menu without shortcut labels; Chromium supplies command availability, and selected read-only text offers Copy.
 
-On macOS the custom menu retains Electron's standard Window menu and application hide commands, including Minimize (⌘M) and Hide (⌘H). Linux keeps the application and Edit menus.
+On macOS the custom menu retains Electron's standard Window menu and application hide commands, including Minimize (⌘M) and Hide (⌘H). Linux removes the menu bar and places application actions in the tray context menu; activating the tray restores the window. Tray activation gestures depend on the desktop environment.
 
 ### Runtime and plugin activation
 
@@ -146,7 +154,7 @@ macOS and Linux GUI launches inherit only the session manager's environment, wit
 
 ## Develop
 
-The development application menu offers Reload Page (Cmd+R on macOS, Ctrl+R elsewhere) and Restart App and Host. Restart waits for Host shutdown before relaunching Electron and starting a new Host; neither action rebuilds source files.
+The development application menu offers Reload Page (Cmd+R on macOS, Ctrl+R on Windows) and Restart App and Host. Restart waits for Host shutdown before relaunching Electron and starting a new Host; neither action rebuilds source files.
 
 `dev:desktop` builds the current Host, client bundles, Web frontend, and Electron shell, projects the built CLI and private Desktop Host packages with their workspace dependencies into a disposable desktop npm project, and launches Electron without resolving dsh from npm:
 

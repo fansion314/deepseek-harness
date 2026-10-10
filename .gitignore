@@ -47,3 +47,10 @@ worktrees/
 .agents/worktrees/
 .typert-*/
 native/system/test/bin/
+/.arch-build/
+/release/
+/aur/*/src/
+/aur/*/pkg/
+/aur/*/*.pkg.tar.zst
+/aur/*/*.tar.zst
+/aur/dsh-electron/deepseek-harness/

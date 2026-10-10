@@ -62,15 +62,18 @@ vi.mock('electron', () => ({
     setAppLogsPath: vi.fn(),
     getPreferredSystemLanguages: () => ['en-US'],
     on: (name: string, callback: (...args: unknown[]) => void) => { state.appListeners.set(name, callback) },
+    once: (name: string, callback: (...args: unknown[]) => void) => { state.appListeners.set(name, callback) },
     quit: state.quit,
     exit: vi.fn(),
   },
   powerMonitor: { on: vi.fn(), off: vi.fn() },
+  screen: { getPrimaryDisplay: () => ({ workAreaSize: { width: 1920, height: 1080 } }) },
   BrowserWindow: class {
     constructor(options: BrowserWindowConstructorOptions) { state.windowOptions = options }
     private ready: (() => void) | undefined
     webContents = { mainFrame: { url: 'dsh-app://app/' }, setWindowOpenHandler: vi.fn(),
-      on: vi.fn(), once: vi.fn(), send: vi.fn(), openDevTools: state.openDevTools }
+      on: vi.fn(), once: vi.fn(), send: vi.fn(), openDevTools: state.openDevTools,
+      setZoomMode: vi.fn(), setZoomFactor: vi.fn() }
     static getAllWindows() { return [] }
     once(name: string, callback: () => void) { if (name === 'ready-to-show') this.ready = callback; return this }
     on() { return this }
@@ -143,7 +146,9 @@ vi.mock('../src/welcome-backend.ts', () => ({
 }))
 vi.mock('node:fs/promises', async importOriginal => ({
   ...await importOriginal<typeof import('node:fs/promises')>(),
-  readFile: vi.fn(async () => '{}'),
+  readFile: vi.fn(async (path: unknown) => String(path).endsWith('window-state.json')
+    ? '{"width":1280,"height":820,"maximized":false}'
+    : String(path).endsWith('interface-scale.json') ? '{"factor":1}' : '{}'),
 }))
 vi.mock('../src/update-dialog.ts', () => ({ DesktopUpdateDialog: class {
   constructor(_preload: string, locale: () => DesktopLocale) { state.dialogLocale = locale }
@@ -159,12 +164,13 @@ vi.mock('../src/welcome-window.ts', () => ({
     state.welcomeLocale = locale
     state.operations = operations
     await state.beforeWelcome()
-    return { once: vi.fn(), close: state.closeWelcome, isDestroyed: () => false,
-      show: vi.fn(), focus: vi.fn(), webContents: { send: vi.fn() } }
+    return { once: vi.fn(), on: vi.fn(), close: state.closeWelcome, isDestroyed: () => false,
+      show: vi.fn(), hide: vi.fn(), focus: vi.fn(), webContents: { send: vi.fn() } }
   },
 }))
 
 afterEach(() => {
+  state.appListeners.get('will-quit')?.()
   vi.clearAllTimers()
   vi.useRealTimers()
   vi.unstubAllEnvs()
@@ -262,7 +268,7 @@ it.each([false, true])('starts welcome onboarding without carrying update focus 
   expect(state.menu).toHaveBeenCalledTimes(initialMenus)
   changed(event, 'en')
   expect(state.dialogLocale!().id).toBe('en')
-  expect(state.menu).toHaveBeenCalledTimes(initialMenus + 1)
+  expect(state.menu).toHaveBeenCalledTimes(initialMenus + (process.platform === 'linux' ? 0 : 1))
   expect(await bootstrap(event)).toEqual({ languages: ['en-US'], preference: 'en' })
   const welcomeCount = state.beforeWelcome.mock.calls.length
   state.hasApiKey = true

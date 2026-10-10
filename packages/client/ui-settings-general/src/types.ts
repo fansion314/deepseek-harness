@@ -33,3 +33,25 @@ export interface DesktopUpdateView {
   readonly failed: boolean
   readonly opening: boolean
 }
+
+/** Device-local workspace zoom and the factors accepted by the desktop shell. */
+export interface DesktopScaleState {
+  readonly factor: number
+  readonly options: readonly number[]
+}
+
+/** Optional desktop-only zoom control; preference files remain main-process-owned. */
+export interface DesktopScaleBridge {
+  /** @returns The persisted zoom and supported choices. */
+  status(): Promise<DesktopScaleState>
+  /**
+   * @param factor - A supported zoom factor.
+   * @returns The state after durable storage and application.
+   */
+  set(factor: number): Promise<DesktopScaleState>
+  /**
+   * @param listener - Receives committed zoom changes.
+   * @returns Subscription disposer.
+   */
+  subscribe(listener: (state: DesktopScaleState) => void): () => void
+}

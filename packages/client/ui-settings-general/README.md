@@ -39,6 +39,8 @@ Settings visibility and section selection live in the shell owner store. The she
 
 ### The General section
 
+Desktop adds an Interface scale row when the preload supplies its zoom API. It offers 75%–200%, saves on the local device, and reports save outcomes through a shell-owned toast that survives closing Settings. Web browsers omit this row. The desktop shell owns persistence and supported factors.
+
 The current release version appears at the bottom of General Settings in Web and Desktop, using the build’s `DSH_CLIENT_VERSION` metadata and the active language. Partial builds without version metadata omit the row.
 
 The Coding Tools switch controls the shared `ui-settings.enabled` preference described by [ui-settings](../ui-settings/README.md#use-this-package). It is available in both Web and desktop, follows accepted changes immediately, and disables duplicate input while a write settles. A failed write displays localized retry guidance.

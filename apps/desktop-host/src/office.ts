@@ -14,8 +14,8 @@ export const name = 'desktop-office'
 export interface Config {
   /** Bundled payload directory. Missing sibling `office-skills` resources fail Host startup. */
   readonly source: string
-  /** Harness-home directory where workspace dependencies are installed. */
-  readonly root: string
+  /** Harness-home installation directory; omit to use system-managed dependencies in place. */
+  readonly root?: string
   /** Prepared or ASAR-contained application dependency directory. */
   readonly runtimeDir: string
 }

@@ -92,6 +92,12 @@ export function apply(ctx) {
   if (!(ctx instanceof Context)) throw new Error('desktop runtime: external plugin loaded another Cordis instance')
   ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: '/desktop-smoke',
     handler(_request, response) { response.end('plugin route ready') } }))
+  ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: '/desktop-smoke-dependencies',
+    async handler(_request, response) {
+      const result = await ctx.tools.execute({ name: 'load_workspace_dependencies', arguments: {},
+        callId: 'desktop-runtime-smoke', signal: new AbortController().signal })
+      response.end(JSON.stringify(result))
+    } }))
   ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: '/desktop-smoke-install',
     async handler(_request, response) {
       try {
@@ -135,7 +141,7 @@ export function apply(ctx) {
   }
 }
 `)
-    writeFileSync(join(plugin, 'bundle.yml'), '- insert:\n    - id: desktop-runtime-smoke-plugin\n      name: desktop-runtime-smoke-plugin\n      inject: [webServer, officeToPdf, skills, pluginManager]\n')
+    writeFileSync(join(plugin, 'bundle.yml'), '- insert:\n    - id: desktop-runtime-smoke-plugin\n      name: desktop-runtime-smoke-plugin\n      inject: [webServer, officeToPdf, skills, tools, pluginManager]\n')
     cpSync(plugin, join(profile, 'node_modules', pluginName), { recursive: true })
     const manifest = JSON.parse(readFileSync(join(profile, 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>
@@ -157,6 +163,18 @@ export function apply(ctx) {
     }
     const pluginResponse = await fetch(new URL('/desktop-smoke', ready.url), { headers: { cookie } })
     if (await pluginResponse.text() !== 'plugin route ready') throw new Error('desktop runtime: plugin HTTP route failed')
+    const dependencyResponse = await fetch(new URL('/desktop-smoke-dependencies', ready.url), {
+      headers: { cookie }, signal: AbortSignal.timeout(120_000),
+    })
+    const dependencyResult = await dependencyResponse.json() as { isError?: boolean; content: { type: string; text?: string }[] }
+    if (dependencyResult.isError) throw new Error(`desktop runtime: dependency discovery failed: ${JSON.stringify(dependencyResult)}`)
+    if (environment.DSH_DESKTOP_PRIMARY_RUNTIME_IN_PLACE === '1') {
+      const text = dependencyResult.content.find(entry => entry.type === 'text')?.text
+      const paths = JSON.parse(text ?? 'null') as { python?: string } | null
+      if (paths?.python !== dependencies.python || existsSync(join(home, 'dsh-runtimes', 'dsh-primary-runtime'))) {
+        throw new Error('desktop runtime: system dependencies must be used in place without a Harness-home copy')
+      }
+    }
     const installation = await fetch(new URL('/desktop-smoke-install', ready.url), {
       headers: { cookie }, signal: AbortSignal.timeout(120_000),
     })

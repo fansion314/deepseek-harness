@@ -79,6 +79,8 @@ const harness = await vi.hoisted(async () => {
       getURL: () => this.urls.at(-1) ?? '',
       mainFrame: { url: '' },
       getZoomFactor: () => 1,
+      setZoomFactor: vi.fn(),
+      setZoomMode: vi.fn(),
       isDestroyed: () => this.destroyed,
       setIgnoreMenuShortcuts: vi.fn(),
       focus: vi.fn(),
@@ -96,6 +98,10 @@ const harness = await vi.hoisted(async () => {
     readonly restore = vi.fn()
     readonly setSize = vi.fn()
     readonly getBounds = vi.fn(() => ({ x: 0, y: 0, width: 800, height: 700 }))
+    readonly getNormalBounds = this.getBounds
+    maximized = false
+    isMaximized() { return this.maximized }
+    readonly maximize = vi.fn(() => { this.maximized = true; this.emit('maximize') })
     readonly setMinimumSize = vi.fn()
     readonly setTitleBarOverlay = vi.fn()
     readonly setVibrancy = vi.fn()
@@ -181,15 +187,17 @@ const harness = await vi.hoisted(async () => {
   const analytics = vi.fn(async (_event: unknown) => {})
   const nativeTheme = { themeSource: 'system', shouldUseDarkColors: false }
   const trays: FakeTray[] = []
+  let trayError: Error | undefined
   class FakeTray extends EventEmitter {
     readonly setToolTip = vi.fn()
     readonly setContextMenu = vi.fn()
     readonly destroy = vi.fn()
-    constructor(readonly image: unknown) { super(); trays.push(this) }
+    constructor(readonly image: unknown) { super(); if (trayError) throw trayError; trays.push(this) }
   }
   const backgroundNotice = { close: vi.fn((hide: () => void) => { hide() }), dispose: vi.fn(), markerPath: undefined as string | undefined }
   const shellDialog = { isOpen: false, focus: vi.fn() }
   return {
+    failTray(error: Error) { trayError = error },
     failWindow(error: Error) { windowFailure = error },
     windows, hosts, handlers, app, FakeWindow, FakeHost, powerMonitor, nativeTheme, analytics,
     trays, FakeTray, backgroundNotice, shellDialog,
@@ -240,6 +248,7 @@ const harness = await vi.hoisted(async () => {
       accountListener = undefined
       windows.length = 0; hosts.length = 0; handlers.clear(); app.removeAllListeners()
       trays.length = 0
+      trayError = undefined
       backgroundNotice.markerPath = undefined
       shellDialog.isOpen = false
       powerMonitor.removeAllListeners()
@@ -280,6 +289,7 @@ vi.mock('electron', () => ({
   dialog: harness.dialog,
   shell: { openExternal: harness.openExternal },
   nativeTheme: harness.nativeTheme,
+  screen: { getPrimaryDisplay: () => ({ workAreaSize: { width: 1920, height: 1080 } }) },
   net: { fetch: vi.fn() },
   ipcMain: {
     on: harness.ipcOn,
@@ -317,6 +327,10 @@ vi.mock('../src/login-shell-environment.ts', async importOriginal => ({
   readDesktopLoginShellEnvironment: harness.loginShell,
 }))
 vi.mock('../src/runtime-tree.ts', () => ({ readDesktopRuntime: () => ({ release: { version: '1.0.0' } }) }))
+vi.mock('../src/window-state.ts', async (importOriginal) => {
+  const { DesktopWindowState } = await importOriginal<typeof import('../src/window-state.ts')>()
+  return { DesktopWindowState: class extends DesktopWindowState { override save = async () => {} } }
+})
 vi.mock('../src/paths.ts', () => ({ resolveDesktopPaths: () => ({ profile: 'desktop-test-profile' }) }))
 vi.mock('../src/project-manager.ts', () => ({
   DesktopProjectManager: class {
@@ -435,6 +449,7 @@ afterEach(async () => {
   await vi.advanceTimersByTimeAsync(0)
   for (const host of harness.hosts) { host.ready.resolve(); host.exited.resolve() }
   await harness.quitCompleted.promise
+  harness.app.emit('will-quit')
   vi.restoreAllMocks()
   vi.clearAllTimers()
   vi.useRealTimers()
@@ -443,6 +458,17 @@ afterEach(async () => {
 })
 
 describe('desktop main startup', () => {
+  it('restores saved dimensions and maximizes only when the workspace is shown', async () => {
+    writeFileSync(join(harness.app.getPath('userData'), 'window-state.json'),
+      JSON.stringify({ width: 1440, height: 900, maximized: true }))
+    await readyWorkspace()
+    const window = harness.windows[0]!
+    expect(window.options).toMatchObject({ width: 1440, height: 900 })
+    expect(window.maximize).not.toHaveBeenCalled()
+    window.emit('show')
+    expect(window.maximize).toHaveBeenCalledOnce()
+  })
+
   it.each([true, false])('selects the package manager before Host startup (packaged=%s)', async (packaged) => {
     harness.app.isPackaged = packaged
     await readyForUpdate()
@@ -1004,6 +1030,12 @@ describe('desktop main startup', () => {
     const template = harness.menu.buildFromTemplate.mock.calls
       .map(call => call[0])
       .find(items => items.some(item => item.role === 'editMenu'))
+    if (platform === 'linux') {
+      expect(template).toBeUndefined()
+      expect(harness.menu.setApplicationMenu).toHaveBeenCalledWith(null)
+      expect(harness.trays).toHaveLength(1)
+      return
+    }
     if (template === undefined) throw new Error('application menu missing')
     expect(template.map(describeItem)).toEqual(platform === 'darwin'
       ? ['Desktop test', en.fileMenu, 'editMenu', 'windowMenu']
@@ -1278,6 +1310,38 @@ describe('desktop main startup', () => {
     const relabels = harness.trays[0]!.setContextMenu.mock.calls.length
     harness.ipcOn.mock.calls.find(call => call[0] === DESKTOP_IPC.localeChanged)![1]({ sender: window.webContents, senderFrame: window.webContents.mainFrame }, 'zh')
     expect(harness.trays[0]!.setContextMenu.mock.calls.length).toBe(relabels + 1)
+  })
+
+  it('hides on Linux window close, reopens from the tray, and waits for the Host on explicit quit', async () => {
+    vi.stubGlobal('process', { ...process, platform: 'linux' })
+    const host = await readyWorkspace()
+    harness.windows[0]!.close()
+    expect(harness.windows[0]!.hide).toHaveBeenCalledOnce()
+    expect(host.inspectQuit).not.toHaveBeenCalled()
+    expect(harness.app.quit).not.toHaveBeenCalled()
+    harness.trays[0]!.emit('click')
+    expect(harness.windows[0]!.show).toHaveBeenCalledTimes(2)
+    harness.app.quit()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(host.inspectQuit).toHaveBeenCalledOnce()
+    await host.stopping.promise
+    expect(harness.app.quit).toHaveBeenCalledOnce()
+    expect(harness.dialog.showMessageBox).not.toHaveBeenCalled()
+    host.exited.resolve()
+    await harness.quitCompleted.promise
+  })
+
+  it('quits on Linux window close when the tray cannot be created', async () => {
+    vi.stubGlobal('process', { ...process, platform: 'linux' })
+    harness.failTray(new Error('tray unavailable'))
+    const host = await readyWorkspace()
+    harness.windows[0]!.close()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(host.inspectQuit).toHaveBeenCalledOnce()
+    await host.stopping.promise
+    host.exited.resolve()
+    await harness.quitCompleted.promise
+    expect(harness.trays).toHaveLength(0)
   })
 
   it('keeps the workspace visible while acknowledgement is pending and ignores a destroyed window', async () => {

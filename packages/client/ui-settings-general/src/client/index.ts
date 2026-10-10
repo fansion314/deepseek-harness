@@ -28,7 +28,9 @@ import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client
 import { createSettingsShellStore } from './shell-store.ts'
 import { SettingsRoot } from './SettingsRoot.tsx'
 import { DesktopUpdateBadge } from './DesktopUpdateIndicator.tsx'
-import type { DesktopUpdateBridge } from '../types.ts'
+import type { DesktopScaleBridge, DesktopUpdateBridge } from '../types.ts'
+import { DesktopScaleSource } from './desktop-scale-source.ts'
+import { DesktopScaleRow, DesktopScaleNotice, type DesktopScaleInjected } from './DesktopScaleRow.tsx'
 import { DesktopUpdateSource } from './desktop-update-source.ts'
 import { CloseLabel, HeaderContent, TriggerContent } from './chrome.tsx'
 import { GeneralSection } from './GeneralSection.tsx'
@@ -86,7 +88,23 @@ export function apply(ctx: ClientContext): void {
   }, CurrentVersionRow))
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-settings-general: dictionaries')
   const connection = ctx.get('connection') as ConnectionHandle
-  const carrier = (globalThis as typeof globalThis & { dshDesktop?: { protocolVersion: number; updates?: DesktopUpdateBridge } }).dshDesktop
+  const carrier = (globalThis as typeof globalThis & {
+    dshDesktop?: { protocolVersion: number; updates?: DesktopUpdateBridge; scale?: DesktopScaleBridge }
+  }).dshDesktop
+  if (carrier?.protocolVersion === 1 && carrier.scale !== undefined) {
+    const scale = new DesktopScaleSource(carrier.scale)
+    ctx.effect(() => () => { scale.dispose() }, 'ui-settings-general: desktop scale carrier')
+    const injectScale = (): DesktopScaleInjected => ({
+      hooks: { scale: scale.store }, setScale: (factor) => { void scale.set(factor) },
+      retry: () => { void scale.load() }, dismiss: (id) => { scale.dismiss(id) },
+    })
+    ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+      name: 'settings.general.item', id: 'desktop-scale', order: 12, locale: NS, inject: injectScale,
+    }, DesktopScaleRow))
+    ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+      name: 'shell.overlay', id: 'desktop-scale-notice', locale: NS, inject: injectScale,
+    }, DesktopScaleNotice))
+  }
   const desktopUpdate = new DesktopUpdateSource(carrier?.protocolVersion === 1 ? carrier.updates : undefined)
   ctx.effect(() => () => { desktopUpdate.dispose() }, 'ui-settings-general: desktop update carrier')
   ctx.slots.inject('sidebar.toggle.badge', () => ctx.slots.register({

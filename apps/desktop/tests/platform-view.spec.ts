@@ -174,6 +174,11 @@ it.each([null, {}, { ...bounds, width: NaN }, { ...bounds, x: -1 }, { ...bounds,
   expect(() => platformBounds(value)).toThrow()
 })
 
+it('converts workspace CSS rectangles using the owning zoom factor', () => {
+  expect(platformBounds({ x: 10, y: 20, width: 200, height: 100 }, 1.5))
+    .toEqual({ x: 15, y: 30, width: 300, height: 150 })
+})
+
 it('opens HTTPS payment links in the system browser without an embedded child window', async () => {
   const { manager, owner } = setup()
   await manager.open(owner, 'top-up', bounds)
