@@ -1,7 +1,7 @@
 /** Check the Arch adapter against actual pacman-owned interpreters and concurrent launches. */
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { access, cp, chmod, mkdtemp, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
+import { access, cp, chmod, lstat, mkdtemp, mkdir, readFile, readdir, readlink, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
@@ -29,7 +29,15 @@ test('concurrent launches reuse metadata and link system runtimes without copyin
     const manifest = JSON.parse(await readFile(join(runtime, 'runtime.json'), 'utf8'))
     assert.equal(manifest.platform, 'linux')
     assert.equal(Object.keys(manifest.pythonPackages).length, 13)
-    assert.equal(await realpath(join(runtime, 'dependencies/python/bin/python3')), await realpath('/usr/bin/python'))
+    const pythonBin = join(runtime, 'dependencies/python/bin')
+    const interpreter = `python${manifest.python.split('.').slice(0, 2).join('.')}`
+    assert.ok((await lstat(join(pythonBin, interpreter))).isFile())
+    for (const name of ['python', 'python3']) assert.equal(await readlink(join(pythonBin, name)), interpreter)
+    assert.equal(await realpath(join(runtime, 'dependencies/python/lib')), '/usr/lib')
+    const pythonProbe = await promisify(execFile)(join(pythonBin, 'python3'), ['-I', '-B', '-c',
+      'import json, sys; import numpy, pandas, docx, pptx, openpyxl; print(json.dumps({"prefix": sys.prefix, "version": ".".join(map(str, sys.version_info[:3]))}))'],
+    { timeout: 30_000 })
+    assert.deepEqual(JSON.parse(pythonProbe.stdout), { prefix: '/usr', version: manifest.python })
     const node = join(runtime, 'dependencies/node/bin/node')
     assert.equal(await realpath(node), join(app, 'runtime/bin/node'))
     const probe = await promisify(execFile)(node, ['-p', 'JSON.stringify(process.versions)'], { env: {}, timeout: 30_000 })

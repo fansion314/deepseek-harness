@@ -26,7 +26,7 @@ export function prepareSystemRuntime(appRoot, cacheRoot) {
   const version = JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8')).version
   const manifest = { desktopVersion: version, platform: 'linux', arch: 'x64', python: python.version,
     node, pnpm, pythonPackages: python.packages }
-  const digest = createHash('sha256').update(JSON.stringify({ format: 3, appRoot: resolve(appRoot), manifest })).digest('hex')
+  const digest = createHash('sha256').update(JSON.stringify({ format: 4, appRoot: resolve(appRoot), manifest })).digest('hex')
   const destination = join(resolve(cacheRoot), digest)
   if (existsSync(join(destination, 'primary-runtime/runtime.json'))) return destination
   mkdirSync(cacheRoot, { recursive: true, mode: 0o700 })
@@ -37,7 +37,12 @@ export function prepareSystemRuntime(appRoot, cacheRoot) {
     mkdirSync(join(dependencies, 'node/bin'), { recursive: true })
     mkdirSync(join(dependencies, 'node/node_modules'))
     symlinkSync(join(appRoot, 'runtime/bin/node'), join(dependencies, 'node/bin/node'))
-    symlinkSync('/usr', join(dependencies, 'python'))
+    const pythonRoot = join(dependencies, 'python')
+    const interpreter = `python${python.version.split('.').slice(0, 2).join('.')}`
+    mkdirSync(join(pythonRoot, 'bin'), { recursive: true })
+    writeFileSync(join(pythonRoot, 'bin', interpreter), '#!/bin/sh\nexec /usr/bin/python "$@"\n', { mode: 0o755 })
+    for (const name of ['python', 'python3']) symlinkSync(interpreter, join(pythonRoot, 'bin', name))
+    symlinkSync('/usr/lib', join(pythonRoot, 'lib'))
     symlinkSync(pnpmRoot, join(dependencies, 'pnpm'))
     writeFileSync(join(staging, 'versions.json'), `${JSON.stringify({ node, pnpm, python: python.version }, null, 2)}\n`)
     symlinkSync(join(appRoot, 'runtime/bin'), join(staging, 'bin'))

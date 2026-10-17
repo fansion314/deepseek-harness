@@ -51,7 +51,7 @@ DSH 专用的 `libreoffice-kit-wasm` 引擎仍随包提供：文档预览和转�
 
 资源位于 `/usr/lib/dsh-electron`。启动器使用 Desktop 可配置的资源路径，并关闭开发者工具。用户配置仍保存在常规 DSH 主目录。Arch 的 `electron` 软件包跟随最新稳定版；主版本升级后，应先验证桌面端和原生模块，再继续依赖现有二进制包。
 
-启动器使用 Electron Node 运行 Host、包操作和主 JavaScript 运行时。它读取当前系统 Python 分发包版本，仅在 `${XDG_CACHE_HOME:-~/.cache}/dsh-electron/runtimes` 下创建元数据和链接。Host 就地使用这些依赖，不将 `/usr` 或解释器复制到 `~/.dsh`。系统版本变化后更新元数据。缺少依赖时启动会报错。系统 Python 遵循 Arch 的外部管理环境策略；额外的系统库通过 pacman 安装，也可使用工作区虚拟环境。
+启动器使用 Electron Node 运行 Host、包操作和主 JavaScript 运行时。它读取当前系统 Python 分发包版本，仅在 `${XDG_CACHE_HOME:-~/.cache}/dsh-electron/runtimes` 下创建元数据、链接和 Python 启动脚本。Python 别名直接指向版本化启动脚本，由它执行 `/usr/bin/python`；库路径链接到 `/usr/lib`。Host 就地使用这些依赖，不将 `/usr` 或解释器复制到 `~/.dsh`。系统版本变化后更新元数据。缺少依赖时启动会报错。系统 Python 遵循 Arch 的外部管理环境策略；额外的系统库通过 pacman 安装，也可使用工作区虚拟环境。
 
 Linux 常驻应用托盘图标。激活图标可恢复窗口；右键菜单提供打开、关于、检查更新、刷新页面、重启应用与 Host 以及退出。关闭工作区或欢迎窗口会隐藏窗口，任务继续运行。桌面环境需支持系统托盘。如果托盘创建失败，关闭窗口则退出。Linux 托盘激活动作由桌面环境决定，可能需要双击。
 
