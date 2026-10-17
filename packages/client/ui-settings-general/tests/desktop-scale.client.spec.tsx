@@ -12,7 +12,8 @@ afterEach(cleanup)
 const initial = { factor: 1, options: [0.75, 1, 1.25, 1.5, 2] }
 const unused = (): never => { throw new Error('Unused standard hook in scale controls') }
 const kit: GlobalStandardProps = { usePanelInfo: unused, useSessions: unused, useSessionStatus: unused,
-  useSessionRetainInfo: unused, useResource: unused, useWorkspaces: unused }
+  useSessionRetainInfo: unused, useResource: unused, useWorkspaces: unused,
+  useRemoteAccess: unused, useSessionAccess: unused, useWorkspaceAccess: unused }
 
 function fixture() {
   let listener: ((state: DesktopScaleState) => void) | undefined
