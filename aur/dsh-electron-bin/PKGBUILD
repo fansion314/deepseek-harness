@@ -18,7 +18,7 @@ options=('!strip')
 _package="dsh-electron-${pkgver}-${pkgrel}-x86_64.pkg.tar.zst"
 source=("${url}/releases/download/${_tag}/${_package}")
 noextract=("${_package}")
-sha256sums=('RELEASE_SHA256')
+sha256sums=('b43fb9302c9f4447c3a37bc51eecfc34b2ee9f5365584849c1698495614b94d3')
 
 package() {
   bsdtar -xf "$srcdir/$_package" -C "$pkgdir" usr
